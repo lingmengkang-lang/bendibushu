@@ -30,6 +30,11 @@ main:
           script: |
             python --version
             python scripts/ci_validate.py
+        - name: 运行测试套件
+          script: |
+            python --version
+            pip install -r requirements.txt
+            python -m unittest discover -s tests -v
 
     # ---------- 流水线 2：在你自己的 Windows 构建节点上安装 Ollama ----------
     - name: setup-ollama-on-windows-node

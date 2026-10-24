@@ -30,7 +30,15 @@ $modelsFile = Join-Path $root "config\ollama-models.txt"
 $logDir = Join-Path $root "logs"
 New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 $logFile = Join-Path $logDir ("setup_ollama_{0}.log" -f (Get-Date -Format "yyyyMMdd_HHmmss"))
-Start-Transcript -Path $logFile -Force | Out-Null
+try { Start-Transcript -Path $logFile -Force | Out-Null } catch { }
+
+# 兜底：任何未预期的终止性错误（含 $ErrorActionPreference=Stop 触发）都必须关闭转录
+# 并非 0 退出；否则转录一直挂着、且 CI 可能把失败当成功。
+trap {
+    try { Write-Err ("未预期的异常: {0}" -f $_) } catch { }
+    try { Stop-Transcript | Out-Null } catch { }
+    exit 1
+}
 
 function Write-Step([string]$msg) { Write-Host ("[==] {0}" -f $msg) -ForegroundColor Cyan }
 function Write-Ok([string]$msg)   { Write-Host ("[OK] {0}" -f $msg) -ForegroundColor Green }
@@ -150,15 +158,40 @@ if ($Models) {
 $modelList = $modelList | Select-Object -Unique
 
 # ---------- 5. 拉取模型（幂等） ----------
+function Get-InstalledModels {
+    """解析 `ollama list` 的 NAME 列，返回已安装模型名集合（精确匹配用）"""
+    param([string]$Exe)
+    $names = @()
+    try {
+        $lines = & $Exe list 2>$null
+        foreach ($l in $lines) {
+            if (-not $l) { continue }
+            $t = "$l".Trim()
+            # 跳过表头与空行
+            if ($t -eq "" -or $t -like "NAME*") { continue }
+            $first = ($t -split "\s+")[0]
+            if ($first) {
+                $names += $first
+                # 兼容带 library/ 命名空间的显示形式
+                if ($first -like "library/*") { $names += ($first -replace "^library/", "") }
+            }
+        }
+    } catch {
+        # list 失败时返回空集合，后续 pull 会暴露真实错误
+    }
+    return ,$names
+}
+
 if ($SkipPull) {
     Write-Step "指定了 -SkipPull，跳过模型拉取。"
 } elseif ($modelList.Count -eq 0) {
     Write-Warn "模型清单为空，无需拉取。"
 } else {
     Write-Step ("待拉取模型 {0} 个: {1}" -f $modelList.Count, ($modelList -join ", "))
-    $have = & $ollamaExe list 2>&1 | Out-String
+    $installed = Get-InstalledModels -Exe $ollamaExe
     foreach ($m in $modelList) {
-        if ($have -match [regex]::Escape($m)) {
+        # 精确匹配 NAME 列：避免 "qwen2.5:7b" 被 "qwen2.5:7b-instruct-q4_K_M" 误判为已存在
+        if ($installed -contains $m) {
             Write-Ok ("已存在，跳过: {0}" -f $m)
             continue
         }
@@ -166,7 +199,7 @@ if ($SkipPull) {
         & $ollamaExe pull $m
         if ($LASTEXITCODE -ne 0) {
             Write-Err ("拉取失败: {0}。可重试或手动执行: ollama pull {0}" -f $m)
-            Stop-Transcript | Out-Null; exit 1
+            exit 1
         }
         Write-Ok ("拉取完成: {0}" -f $m)
     }

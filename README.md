@@ -83,7 +83,14 @@ local-offline-assistant/
 │       └── setup-ollama.yml        GitHub Actions：云端校验 + 自托管节点装 Ollama/模型
 ├── .cnb.yml                        CNB 流水线：云端校验 + 自托管 Windows 节点装 Ollama/模型
 ├── deploy/
-│   └── install.ps1                 一键部署脚本
+│   ├── install.ps1                 一键部署脚本（Windows PowerShell）
+│   ├── bootstrap.py                跨平台一键部署（纯 Python，Linux/macOS/Windows 通用）
+│   └── setup.sh                    Linux/macOS 便捷入口（调 bootstrap.py）
+├── tests/                          零依赖测试套件（unittest；云端 CI 真跑）
+│   ├── test_repo_structure.py      仓库结构/配置/PS1 BOM/文档链接
+│   ├── test_ci_validate.py         在真实仓库上跑 ci_validate.py
+│   ├── test_rag_manager.py         分块/收集/导入检索（含离线集成测试）
+│   └── test_bootstrap.py           bootstrap 纯函数与目录初始化
 ├── scripts/
 │   ├── start.ps1 / stop.ps1        服务启停（PID 文件精准停止，防误杀）
 │   ├── setup_ollama.ps1            安装 Ollama + 拉模型（幂等；两平台 CI 共用）
@@ -109,10 +116,11 @@ local-offline-assistant/
 │   │   ├── brand_onboarding_template.md  ⭐ 品牌/器件接入骨架模板（填空即用）
 │   │   └── sample_plc_doc.md       知识库示例样板（也可作 RAG 导入测试）
 │   ├── scada/                      ⭐ 组态软件 TOP5 自动编程能力（组态王/MCGS/WinCC/力控/威纶通）
-│   ├── host/                       上位机程序样例（你自己持续补充）
+│   ├── host/                       上位机程序样例（含 write_safety_template.md 写入安全模板）
 │   ├── devices/                    ⭐ 常用电气件使用方法（你自己持续补充）
-│   └── deploy/
-│       └── ollama_setup.md         ⭐ 让 GitHub/CNB 自动帮你装 Ollama+模型（自托管节点）
+│   ├── deploy/
+│   │   └── ollama_setup.md         ⭐ 让 GitHub/CNB 自动帮你装 Ollama+模型（自托管节点）
+│   └── review/                     ⭐ 双视角审查报告（资深 IT + 20 年电气自动化）
 └── data/ logs/ models/ lora/output/   运行时目录（部署时自动创建，不入库）
 ```
 
@@ -124,7 +132,12 @@ git clone <你的仓库地址> local-offline-assistant
 cd local-offline-assistant
 
 # 1. 一键部署（创建 venv、装依赖、建目录、跑自检）
+#    Windows：
 .\deploy\install.ps1
+#    Linux / macOS（跨平台等价入口）：
+#    ./deploy/setup.sh
+#    Python 直跑（可加 --dry-run 只预览不落盘；--install-ollama 尝试装 Ollama）：
+#    python deploy/bootstrap.py
 #   想自动尝试 winget 装 Ollama：.\deploy\install.ps1 -InstallOllama
 
 # 2. 安装 Ollama 引擎 + 拉取模型（幂等，可反复跑；也可交给 CI 做，见下一步）
@@ -142,6 +155,9 @@ python scripts\rag_manager.py search "西门子 S7-1200 高速计数器怎么配
 # 5. 接入 WorkBuddy（可选）
 #    按 config\workbuddy\knowledge-base.md 合并 mcp.fragment.json 到 ~/.workbuddy/mcp.json
 ```
+
+> **本机零预装验证**：本工程所有部署能力都收在仓库里，CI 也只依赖 Python 3.10+。
+> 你也可以在部署前用 `python deploy/bootstrap.py --dry-run` 预览将要做的所有改动。
 
 > **不想自己动手装 Ollama？** 把你的机器注册成 GitHub 自托管 runner 或 CNB 自托管
 > Windows 构建节点，之后在网页上点一下「Run workflow」，两个平台就会自动把
@@ -222,15 +238,16 @@ A：7B 偏弱、易幻觉；建议至少 **14B**（24G 内存可舒适跑）。�
 
 ## 九、自动化：让两个平台替你装引擎、做校验
 
-| 平台 | 流水线 | 运行位置 | 作用 |
+| 平台 | 流水线 / Job | 运行位置 | 作用 |
 |---|---|---|---|
 | GitHub | `validate` | 云端 ubuntu-latest | 仓库结构校验（`scripts/ci_validate.py`），公开仓库也安全 |
+| GitHub | `test` | 云端 ubuntu-latest | 跑 `tests/` 零依赖测试套件（22 例全过） |
 | GitHub | `setup-ollama` | **你的 Windows 本机**（自托管 runner） | 装 Ollama + 拉模型；默认仅网页手动触发 |
-| CNB | `validate-repo` | 云端 amd64 | 仓库结构校验 |
-| CNB | `setup-ollama-on-windows-node` | **你的 Windows 本机**（自托管构建节点） | 装 Ollama + 拉模型 |
+| CNB | `validate-repo` | 云端 amd64 | 仓库结构校验 **+** `tests/` 测试套件 |
+| CNB | `setup-ollama-on-windows-node` | **你的 Windows 本机**（自托管构建节点） | 装 Ollama + 拉模型（`allowFailure`，装完需人工复核） |
 
 两平台共用 `scripts/setup_ollama.ps1`（幂等：已装的跳过、已拉的模型跳过）。
-注册自托管节点与安全注意事项见 `docs/deploy/ollama_setup.md`。
+注册自托管节点与安全注意事项（含"公开仓库 + 自托管 = 任意代码在你的电脑跑"的风险）见 `docs/deploy/ollama_setup.md` 与 `docs/plc/SAFETY.md` 第五节。
 
 ## 十、信息来源与存疑标注汇总
 
@@ -246,6 +263,18 @@ A：7B 偏弱、易幻觉；建议至少 **14B**（24G 内存可舒适跑）。�
   6. CNB 自托管节点的接入脚本与标签（以组织设置 → 构建节点 → 连接指引弹窗显示的为准）；
   7. `docs/scada/`、`docs/devices/` 中各品牌脚本语法与寄存器地址（随版本变化，必须按你所用版本手册核对）。
 
-## 十一、许可
+## 十一、测试与双视角质量审查
+
+本工程自带质量门禁，且**严格不向本机安装任何东西**——CI 在云端真跑，本机只用既有 venv 复验：
+
+- **`scripts/ci_validate.py`**：零依赖仓库结构校验（文件/目录/配置 JSON/PS1 BOM/文档链接），CI 门禁。
+- **`tests/`**：零依赖 `unittest` 套件（22 例全过），含 `rag_manager` 分块/收集/导入检索的**离线集成测试**（用 `FakeEmbedding` 避免联网下载嵌入模型）。
+- **本机复验**：`python -m unittest discover -s tests -v` 与 `python scripts/ci_validate.py`（均只用仓库内已有 venv，不装新包）。
+
+**双视角审查报告**（`docs/review/`）：
+- `it_review.md` —— 资深 30 年 IT 工程师视角：安全 / 健壮性 / 幂等 / 可观测 / CI 正确性，含 bug 清单与严重级；
+- `automation_review.md` —— 20 年电气自动化工程师视角：Modbus 0基/1基偏移、各品牌脚本语法准确性、上位机写入校验/轮询/超时、安全红线充分性，给出"必须改/建议改/可不改"结论。
+
+## 十二、许可
 
 仓库采用 **MIT 许可证**（`LICENSE` 文件）。公开仓库，可自由使用、修改、分发，但按 MIT 条款须保留版权与许可声明；不提供任何担保。

@@ -62,6 +62,27 @@ jobs:
       - name: 运行校验
         run: python scripts/ci_validate.py
 
+  # ---------- 云端测试：不碰本机，验证仓库自带测试套件 ----------
+  test:
+    name: 测试套件（云端）
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装核心依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 运行测试套件
+        run: python -m unittest discover -s tests -v
+
   # ---------- 本机安装：需要自托管 runner ----------
   setup-ollama:
     name: 安装 Ollama + 拉取模型（本机自托管节点）

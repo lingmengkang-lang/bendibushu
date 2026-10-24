@@ -120,29 +120,35 @@ def main() -> int:
               f"PS1 带 BOM: {rel}",
               f"PS1 缺少 UTF-8 BOM（PowerShell 5.1 中文会乱码）: {rel}")
 
-    # ---------- 5. Markdown 相对链接 ----------
+    # ---------- 5. Markdown 相对链接（跳过代码块，避免把示例链接误报为失效） ----------
     link_re = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+    fence_re = re.compile(r"^\s*(```|~~~)")
     broken = 0
     checked = 0
     for md in sorted(ROOT.glob("docs/**/*.md")) + [ROOT / "README.md"]:
         if not md.is_file():
             continue
-        text = md.read_text(encoding="utf-8", errors="replace")
-        for target in link_re.findall(text):
-            t = target.strip()
-            if t.startswith(("http://", "https://", "#", "mailto:")):
+        in_fence = False
+        for line in md.read_text(encoding="utf-8", errors="replace").splitlines():
+            if fence_re.match(line):
+                in_fence = not in_fence
                 continue
-            path_part = t.split("#", 1)[0].strip()
-            if not path_part:
+            if in_fence:
                 continue
-            checked += 1
-            if not (md.parent / path_part).resolve().exists():
-                broken += 1
-                results.append(("WARN", f"链接目标不存在: {md.relative_to(ROOT)} -> {path_part}"))
-    check(True, f"Markdown 相对链接检查 {checked} 处，失效 {broken} 处", "")
+            for target in link_re.findall(line):
+                t = target.strip()
+                if t.startswith(("http://", "https://", "#", "mailto:")):
+                    continue
+                path_part = t.split("#", 1)[0].strip()
+                if not path_part:
+                    continue
+                checked += 1
+                if not (md.parent / path_part).resolve().exists():
+                    broken += 1
+                    results.append(("WARN", f"链接目标不存在: {md.relative_to(ROOT)} -> {path_part}"))
+    results.append(("PASS", f"Markdown 相对链接检查 {checked} 处，失效 {broken} 处"))
 
     # ---------- 输出 ----------
-    width = max(len(m) for _, m in results) if results else 10
     n_pass = n_warn = n_fail = 0
     for level, msg in results:
         if level == "PASS":
