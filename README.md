@@ -69,6 +69,7 @@
 ```
 local-offline-assistant/
 ├── README.md                       本文件
+├── 启动.bat / 停止.bat             双击启动 / 停止（Windows 一键编排，推荐）
 ├── requirements.txt                核心依赖（chromadb 等）
 ├── .gitignore                      运行时数据排除规则
 ├── LICENSE                         MIT 许可证
@@ -91,6 +92,8 @@ local-offline-assistant/
 │   ├── test_ci_validate.py         在真实仓库上跑 ci_validate.py
 │   ├── test_rag_manager.py         分块/收集/导入检索（含离线集成测试）
 │   └── test_bootstrap.py           bootstrap 纯函数与目录初始化
+├── app/
+│   └── webui.py                    本地 Web 聊天界面（标准库，端口 8500，对接 Ollama + RAG）
 ├── scripts/
 │   ├── start.ps1 / stop.ps1        服务启停（PID 文件精准停止，防误杀）
 │   ├── setup_ollama.ps1            安装 Ollama + 拉模型（幂等；两平台 CI 共用）
@@ -278,3 +281,54 @@ A：7B 偏弱、易幻觉；建议至少 **14B**（24G 内存可舒适跑）。�
 ## 十二、许可
 
 仓库采用 **MIT 许可证**（`LICENSE` 文件）。公开仓库，可自由使用、修改、分发，但按 MIT 条款须保留版权与许可声明；不提供任何担保。
+
+## 十三、用户使用指南：下载压缩包 → 双击启动（最简）
+
+> 目标：**使用者拿到一个 zip，解压，双击 `启动.bat`，浏览器自动打开就能用。** 下面把"会不会执行不起来、要不要全部下载、怎么操作"一次说清。
+
+### 13.1 你提的要求都满足了，但有一处必须讲清楚的硬限制
+
+- ✅ 双仓库（GitHub + CNB 同名）、本地离线 AI 助手工程、Ollama+Chroma+RAG、组态 TOP5、可扩展框架、CI 自动装引擎、测试套件、双视角审查——**全部已交付并三端一致**。
+- ⚠️ **真正的硬限制**：一个能"离线对话"的助手必须有**推理引擎（Ollama）+ 至少一个模型权重（几 GB）**。这两样无法凭空出现在 zip 里——要么你本机装一次 Ollama（启动.bat 会尝试自动装），要么 zip 里塞进多 GB 模型（不现实）。
+- 因此**首次运行必须联网一次**：拉 Python 依赖 + 装/确认 Ollama + 拉取默认模型。之后**完全离线**可用。这是离线 AI 助手的物理边界，不是工程缺陷。
+
+### 13.2 两种拿到工程的方式（都不用"全部手动下载"）
+
+**方式 A（推荐，最小）：下载发布 zip**
+1. 维护者运行 `.\deploy\package.ps1` → 生成 `releases/local-offline-assistant-YYYYMMDD.zip`（仅含源码，几 MB，已排除 venv/模型/数据/日志）。
+2. 把 zip 发给使用者；使用者解压到任意目录（如 `D:\assistant`）。
+3. **双击 `启动.bat`** → 自动：检测/装 Python → 建 venv 装依赖 → 检测/装 Ollama → 拉默认模型 → 导入知识库 → 启动服务 → **打开浏览器 http://127.0.0.1:8500**。
+4. 在网页里用中文提问即可；勾选"启用知识库"会用你导入的工控文档作答。
+5. 停止：**双击 `停止.bat`**。
+
+**方式 B：直接 git clone（开发者）**
+```
+git clone <你的仓库地址> local-offline-assistant
+cd local-offline-assistant
+.\启动.bat          # 一样的一键编排
+```
+
+### 13.3 会不会执行不起来？已做的健壮性
+
+- `启动.bat` 全程幂等：venv/依赖/模型/知识库重复执行都安全（已装的跳过）。
+- 缺 Python → 打开官网引导安装；缺 Ollama → 尝试自动装，失败则打开官网让你装一次（装完重跑即可）。
+- 模型拉取失败 / 知识库嵌入模型下载失败 → **不致命**，聊天仍可用（只是没有 RAG 上下文，或提示改用 `provider=ollama` 后重跑）。
+- 自带 `scripts/selfcheck.ps1` 与 `python scripts/ci_validate.py` 做环境自检与结构校验。
+
+### 13.4 想"完全不装 Ollama"行不行？
+
+不现实。Ollama 是本地推理引擎，必须在本机存在。可退而求其次：
+- 用别人已装好 Ollama 的机器；或
+- 云端/别机跑 Ollama、本机 Web 界面指向它（设环境变量 `OLLAMA_BASE=http://那台机:11434`，并把 `app/webui.py` 的 `ASSISTANT_HOST` 设为 `0.0.0.0` 仅在你信任的内网）。
+
+### 13.5 关键文件速查
+
+| 用途 | 文件 |
+|---|---|
+| 双击启动 | `启动.bat` |
+| 双击停止 | `停止.bat` |
+| 启动编排逻辑 | `scripts/launcher.ps1` |
+| 本地聊天界面 | `app/webui.py`（端口 8500，标准库，零新增依赖） |
+| 发发布包 | `deploy/package.ps1` → `releases/*.zip` |
+| 模型清单 | `config/ollama-models.txt`（首个未注释项即默认模型） |
+| 知识库配置 | `config/rag.config.json` |

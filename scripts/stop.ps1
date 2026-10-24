@@ -39,6 +39,7 @@ function Stop-ByPidFile([string]$PidFile, [string]$ExpectName) {
 }
 
 Write-Host "===== 停止服务 =====" -ForegroundColor Cyan
+Stop-ByPidFile (Join-Path $logDir "assistant.pid") "python"
 Stop-ByPidFile (Join-Path $logDir "webui.pid")   "python"
 Stop-ByPidFile (Join-Path $logDir "ollama.pid")  "ollama"
 

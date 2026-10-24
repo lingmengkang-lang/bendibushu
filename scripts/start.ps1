@@ -9,6 +9,7 @@
 
 param(
     [switch]$WebUI,
+    [switch]$Assistant,
     [switch]$NoOllama
 )
 
@@ -70,17 +71,41 @@ if ($WebUI) {
     }
 }
 
+# ---------- 本地助手 Web 界面（标准库，端口 8500）----------
+if ($Assistant) {
+    $port = 8500
+    $already = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
+    if ($already) {
+        Write-Host "[SKIP] 助手 Web 界面已在运行（$port 监听中）。" -ForegroundColor Yellow
+    } else {
+        $py = Join-Path $root "venv\Scripts\python.exe"
+        if (-not (Test-Path $py)) {
+            Write-Host "[WARN] 未找到 venv\Scripts\python.exe。请先执行 deploy\install.ps1 创建 venv。" -ForegroundColor Yellow
+        } else {
+            Write-Host "正在启动本地助手 Web 界面（端口 $port）..."
+            $proc = Start-Process -FilePath $py -ArgumentList ("app\webui.py","--port",$port) -WorkingDirectory $root -WindowStyle Hidden -PassThru
+            $proc.Id | Out-File -FilePath (Join-Path $logDir "assistant.pid") -Encoding ASCII
+            Start-Sleep -Seconds 2
+            Write-Host ("[OK] Web 界面启动中 (PID {0})，浏览器打开 http://127.0.0.1:{1}" -f $proc.Id, $port) -ForegroundColor Green
+            try { Start-Process "http://127.0.0.1:$port" } catch { }
+        }
+    }
+}
+
 # ---------- 状态与下一步 ----------
 Write-Host ""
 Write-Host "===== 服务状态 =====" -ForegroundColor Cyan
 $s11434 = if (Get-NetTCPConnection -LocalPort 11434 -ErrorAction SilentlyContinue) { "运行中" } else { "未运行" }
 $s7860  = if (Get-NetTCPConnection -LocalPort 7860 -ErrorAction SilentlyContinue) { "运行中" } else { "未运行" }
+$s8500  = if (Get-NetTCPConnection -LocalPort 8500 -ErrorAction SilentlyContinue) { "运行中" } else { "未运行" }
 Write-Host ("  Ollama  (11434): {0}" -f $s11434)
 Write-Host ("  WebUI   ( 7860): {0}" -f $s7860)
+Write-Host ("  助手Web ( 8500): {0}" -f $s8500)
 Write-Host ""
 Write-Host "下一步提示：" -ForegroundColor Cyan
 Write-Host "  1) 安装引擎+拉取模型（首次必须，幂等可反复跑）: .\scripts\setup_ollama.ps1"
 Write-Host "     或手动: ollama pull qwen2.5:14b （清单见 config\ollama-models.txt）"
 Write-Host "  2) 一键导入知识库: python scripts\rag_manager.py add-all"
 Write-Host "  3) 检索测试      : python scripts\rag_manager.py search ""三菱FX5U Modbus 地址"""
-Write-Host "  4) 停止服务      : .\scripts\stop.ps1"
+Write-Host "  4) 打开聊天界面  : 浏览器访问 http://127.0.0.1:8500  （或 .\scripts\start.ps1 -Assistant）"
+Write-Host "  5) 停止服务      : .\scripts\stop.ps1"
