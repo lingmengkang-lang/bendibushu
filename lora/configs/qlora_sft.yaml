@@ -1,0 +1,52 @@
+### LLaMA-Factory QLoRA SFT 配置模板
+### 说明：以下为 LLaMA-Factory 常见配置字段，实际可用字段随版本演进，
+###       请以你安装版本的官方文档为准（https://llamafactory.readthedocs.io/）
+###
+### 重要区别（先读这个再训练）：
+###   - 本配置的 model_name_or_path 需要 HuggingFace/ModelScope 格式的模型
+###     （本地目录或在线 ID），与 Ollama 使用的 gguf 格式不通用；
+###   - 训练产物要用于 Ollama 推理，需经过"合并 LoRA -> 导出 -> Ollama 导入"流程，
+###     具体命令以两个项目官方文档为准，本工程不固化命令（版本差异大，固化即过时）。
+
+### 模型（改为你本地已下载的 HF 格式路径，或在线 ID）
+model_name_or_path: Qwen/Qwen2.5-7B-Instruct
+trust_remote_code: true
+
+### 训练方法
+stage: sft
+do_train: true
+finetuning_type: lora
+lora_target: all
+lora_rank: 8
+lora_alpha: 16
+lora_dropout: 0.05
+
+### 量化（QLoRA 4bit；把下面两行注释掉即为普通 LoRA，显存需求更高）
+quantization_bit: 4
+quantization_type: nf4
+
+### 数据集（名称对应 lora/dataset/dataset_info.json 中的注册项）
+dataset: sample_sft
+template: qwen
+cutoff_len: 1024
+max_samples: 1000
+
+### 训练超参（以下为常用起始值，需按显卡显存与收敛效果调整）
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 8
+learning_rate: 0.0001
+num_train_epochs: 3.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.1
+weight_decay: 0.01
+
+### 精度与稳定性（bf16 需 Ampere 及以上 NVIDIA 显卡；老卡改为 fp16: true）
+bf16: true
+gradient_checkpointing: true
+
+### 输出与日志
+output_dir: output/sample-lora
+logging_steps: 10
+save_steps: 100
+plot_loss: true
+overwrite_output_dir: true

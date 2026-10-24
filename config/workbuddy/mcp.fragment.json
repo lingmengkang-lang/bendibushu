@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "ollama-local": {
+      "command": "node",
+      "args": ["<path-to-your-mcp-server>/dist/index.js"],
+      "env": {
+        "OLLAMA_BASE_URL": "http://127.0.0.1:11434"
+      }
+    }
+  }
+}

@@ -1,0 +1,36 @@
+# ===== Python 环境 =====
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# ===== 本地数据（不入库，保留 .gitkeep 占位）=====
+data/chroma/*
+!data/chroma/.gitkeep
+data/knowledge_base/docs/*
+!data/knowledge_base/docs/.gitkeep
+logs/*
+!logs/.gitkeep
+*.log
+
+# ===== 模型与训练产物（体积大，禁止提交，保留 .gitkeep 占位）=====
+models/*
+!models/.gitkeep
+lora/output/*
+!lora/output/.gitkeep
+lora/dataset/data/*.jsonl
+*.bin
+*.safetensors
+*.gguf
+
+# ===== 系统与编辑器 =====
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# ===== 敏感信息 =====
+.env
+*credentials*.json

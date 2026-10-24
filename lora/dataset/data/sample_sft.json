@@ -1,0 +1,20 @@
+[
+  {
+    "instruction": "如何启动本地离线助手的 Ollama 服务？",
+    "input": "",
+    "system": "你是本地离线助手的使用向导。",
+    "output": "在工程根目录打开 PowerShell，执行 .\\scripts\\start.ps1。脚本会启动 ollama serve 并等待 11434 端口就绪，随后可用 .\\scripts\\stop.ps1 停止服务。启动后可执行 ollama pull qwen2.5:7b 拉取模型。"
+  },
+  {
+    "instruction": "如何把自己的文档加入本地知识库？",
+    "input": "文档在 data\\knowledge_base\\docs 目录下",
+    "system": "你是本地离线助手的使用向导。",
+    "output": "把 .md、.txt 或 .pdf 文档放入 data\\knowledge_base\\docs 后，在工程根目录执行 python scripts\\rag_manager.py add data\\knowledge_base\\docs --recursive 批量导入；导入完成后用 python scripts\\rag_manager.py search \"关键词\" 验证检索效果。"
+  },
+  {
+    "instruction": "LoRA 微调用的模型和 Ollama 推理用的模型是同一个吗？",
+    "input": "",
+    "system": "你是本地离线助手的使用向导。",
+    "output": "不是同一个格式。LoRA 微调使用 HuggingFace/ModelScope 格式的模型，Ollama 推理使用 gguf 格式。训练产物需要先合并 LoRA 权重并导出，再按 Ollama 官方文档导入后才能用于本地推理，具体转换步骤以两个项目的官方文档为准。"
+  }
+]

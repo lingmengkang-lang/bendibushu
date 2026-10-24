@@ -1,0 +1,19 @@
+{
+  "chroma": {
+    "persist_dir": "data/chroma",
+    "collection": "offline_kb",
+    "comment": "collection 为向量库集合名，rag_manager.py 的 list/search/clear 均按此名操作"
+  },
+  "embedding": {
+    "provider": "chroma-default",
+    "ollama_model": "nomic-embed-text",
+    "comment": "provider=chroma-default 使用 Chroma 内置 ONNX 嵌入模型（首次运行会自动下载一次模型权重，需联网；之后完全离线）；provider=ollama 时使用本地 Ollama 嵌入模型（需先 ollama pull ollama_model 指定的模型）"
+  },
+  "chunk": {
+    "size": 500,
+    "overlap": 50,
+    "comment": "文档分块字符数与重叠字符数，中文场景 400~600 常用，可按检索效果调整"
+  },
+  "supported_ext": [".md", ".txt", ".pdf"],
+  "knowledge_base_dir": "data/knowledge_base/docs"
+}

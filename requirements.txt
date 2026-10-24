@@ -1,0 +1,12 @@
+# local-offline-assistant 核心依赖
+# 安装方式：见 deploy/install.ps1（自动创建 venv 后安装）
+# 版本说明：主版本下限锁定，次版本不锁死，实际以 pip 解析与官方文档为准
+
+# RAG 向量库（本地持久化，无需外部服务）
+chromadb>=0.5.0,<2.0.0
+
+# PDF 文档解析（RAG 导入 PDF 时需要；只用 md/txt 可删除本行）
+pypdf>=4.0.0
+
+# 说明：LoRA 微调依赖（torch / llamafactory 等）体积大且与 GPU 强相关，
+# 单独放在 lora/requirements.txt，不随核心环境安装，避免拖垮轻量部署。

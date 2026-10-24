@@ -1,0 +1,13 @@
+# LLaMA-Factory 微调依赖（独立于核心环境）
+#
+# 安装顺序很重要：
+#   1. 先按 PyTorch 官网指引安装与你的 CUDA 驱动匹配的 torch（CPU 训练不现实，务必装 GPU 版）
+#   2. 再安装本文件，避免自动拉取 CPU 版 torch
+#
+# 参考命令（CUDA 12.x 示例；具体索引地址以 pytorch.org 当前页面为准）：
+#   pip install torch --index-url https://download.pytorch.org/whl/cu121
+#
+# 然后：
+#   pip install -r lora/requirements.txt
+
+llamafactory
