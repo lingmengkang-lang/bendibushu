@@ -11,6 +11,7 @@
 # 参数：
 #   -Models "qwen2.5:14b,nomic-embed-text"  指定要拉的模型；缺省解析 config\ollama-models.txt
 #   -SkipPull                               只安装 Ollama 引擎，不拉模型
+#   -PullVision                             额外拉取视觉/图片解析模型（config\ollama-vision-model.txt；best-effort，失败不致命）
 #   -NoServe                                装完不启动 ollama serve
 #   -InstallerPath <本地 OllamaSetup.exe>   有本地安装包时直接静默安装（跳过 winget）
 #
@@ -21,6 +22,7 @@ param(
     [string]$Models = "",
     [switch]$SkipPull,
     [switch]$NoServe,
+    [switch]$PullVision,
     [string]$InstallerPath = ""
 )
 
@@ -202,6 +204,31 @@ if ($SkipPull) {
             exit 1
         }
         Write-Ok ("拉取完成: {0}" -f $m)
+    }
+}
+
+# ---------- 5b. 视觉/图片解析模型（-PullVision 时；best-effort，失败不致命）----------
+if ($PullVision -and -not $SkipPull) {
+    $visionFile = Join-Path $root "config\ollama-vision-model.txt"
+    $visionModel = "qwen2.5vl:7b"
+    if (Test-Path $visionFile) {
+        foreach ($line in Get-Content $visionFile) {
+            $t = $line.Trim()
+            if (-not $t -or $t.StartsWith("#")) { continue }
+            $visionModel = ($t -split "#")[0].Trim(); break
+        }
+    }
+    $installed = Get-InstalledModels -Exe $ollamaExe
+    if ($installed -contains $visionModel) {
+        Write-Ok ("视觉模型已存在，跳过: {0}" -f $visionModel)
+    } else {
+        Write-Step ("拉取视觉/图片解析模型 {0} （体积较大，best-effort）..." -f $visionModel)
+        & $ollamaExe pull $visionModel
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warn ("视觉模型拉取失败: {0}。图片解析功能暂不可用；可稍后手动: ollama pull {0}" -f $visionModel)
+        } else {
+            Write-Ok ("视觉模型就绪: {0}" -f $visionModel)
+        }
     }
 }
 

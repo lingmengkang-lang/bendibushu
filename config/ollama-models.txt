@@ -16,6 +16,10 @@ deepseek-r1:14b   # 推理链显式输出，适合故障排查 / 逻辑分析类
 nomic-embed-text  # 英文为主；中文场景以 Ollama library 实际可用为准
 # bge-m3 / paraphrase-multilingual 等中文更强的嵌入模型（以 library 实际可用为准）
 #
+# ---------- 视觉模型（图片解析，见 docs/plc/image_parsing.md）----------
+# 视觉模型清单与备选（llava:7b / minicpm-v）见 config/ollama-vision-model.txt，
+# 默认 qwen2.5vl:7b；首次拉取：ollama pull qwen2.5vl:7b
+#
 # ---------- 硬件与"速度换能力"参考【⚠️以下为经验值，请以实际显存/内存与运行日志为准】----------
 # 8GB 显存        -> 7B Q4 量化
 # 16GB 显存       -> 14B Q4 或 7B Q8

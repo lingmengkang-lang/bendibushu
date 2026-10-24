@@ -207,6 +207,66 @@ def default_model():
     return "qwen2.5:14b"
 
 
+def default_vision_model():
+    # 图片解析（视觉）默认模型，见 config/ollama-vision-model.txt
+    p = ROOT / "config/ollama-vision-model.txt"
+    try:
+        for line in p.read_text(encoding="utf-8").splitlines():
+            t = line.strip()
+            if not t or t.startswith("#"):
+                continue
+            return t.split("#")[0].strip()
+    except Exception:
+        pass
+    return "qwen2.5vl:7b"
+
+
+# 图片解析专用规则（在 SYSTEM_PROMPT 的 10 条铁律之上，进一步约束“看得清的才说”以提升准确度）
+VISION_PROMPT = (
+    "\n\n===== 图片解析专用规则（提高准确度，必须遵守）=====\n"
+    "你正在解析用户上传的工控相关图片。总原则：看得清的才说，看不清/不确定的明说，绝不臆造。\n"
+    "A. 识别边界：严格区分「图中确实可见的信息」与「你的推测/常识」；推测必须标注“（推测，需现场核对）”。\n"
+    "B. 逐字段精确：型号、参数号、额定值、端子号/地址、单位、版本号要逐个读出并原样列出；"
+    "易混字符（O/0、I/1、S/5、B/8、Z/2）结合上下文判断，并提示用户核对原件。\n"
+    "C. 按图片类型处理：\n"
+    "   1) 电气/PLC 图纸、程序截图：说明图/程序结构与联锁逻辑，标出地址/寄存器及其 0基/1基偏移；\n"
+    "   2) 变频器/伺服/编码器铭牌与参数面板：列出型号、额定电压/电流/功率、参数号与设定值、端子定义；\n"
+    "   3) HMI/组态画面/报警：读出变量名/地址、报警代码与文本，给出可能原因与排查顺序；\n"
+    "   4) 通用文字：把图中文字尽量完整提取为可复制文本，保留原有换行与顺序。\n"
+    "D. 图纸符号按 IEC 60617 / 行业惯例解释；不认识的符号直说不认识，不瞎猜。\n"
+    "E. 安全红线：图片中的参数/图纸仅作起草参考，正式采用前必须经合格工程师核对原件 + 仿真验证，"
+    "绝不能仅凭图片识别结果直接下装到现场设备。\n"
+    "==============================================\n"
+)
+
+
+def _b64_strip(s):
+    """接受 data URL（data:image/png;base64,...）或纯 base64，返回纯 base64 字符串。"""
+    if not isinstance(s, str):
+        return ""
+    if s.startswith("data:"):
+        i = s.find("base64,")
+        if i != -1:
+            return s[i + len("base64,"):].strip()
+    return s.strip()
+
+
+def ollama_vision_generate(model: str, prompt: str, images_b64, timeout: int = 180):
+    """调用 Ollama 多模态 /api/generate（qwen2.5vl / llava / minicpm-v 等均支持）。"""
+    imgs = [x for x in (_b64_strip(i) for i in (images_b64 or [])) if x]
+    payload = json.dumps({
+        "model": model, "prompt": prompt, "images": imgs,
+        "stream": False, "options": {"temperature": 0.2},
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        f"{OLLAMA_BASE}/api/generate", data=payload,
+        headers={"Content-Type": "application/json"}, method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        data = json.loads(r.read().decode("utf-8"))
+    return data.get("response", "")
+
+
 def ollama_chat(model: str, messages: list, timeout: int = 120):
     payload = json.dumps({"model": model, "messages": messages, "stream": False}).encode("utf-8")
     req = urllib.request.Request(
@@ -247,12 +307,15 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(_health_cache["data"])
                 return
             ver, models = _ollama_probe()
+            vmodel = default_vision_model()
             data = {
                 "ollama": ver is not None,
                 "ollama_version": ver,
                 "rag": rag_available(),
                 "models": models,
                 "default_model": default_model(),
+                "vision_model": vmodel,
+                "vision_available": vmodel in models,
             }
             _health_cache["data"] = data
             _health_cache["ts"] = now
@@ -283,22 +346,67 @@ class Handler(BaseHTTPRequestHandler):
         history = payload.get("history") or []
         model = payload.get("model") or default_model()
         use_rag = bool(payload.get("rag", True))
-        if not message:
+        images = [x for x in (_b64_strip(i) for i in (payload.get("images") or [])) if x]
+        if not message and not images:
             self._send_json({"error": "empty message"}, code=400)
             return
         if not ollama_health():
+            hint_extra = ""
+            if images:
+                vmodel = default_vision_model()
+                hint_extra = (f"（本次为图片解析请求，将使用视觉模型 {vmodel}；"
+                              f"Ollama 就绪后如提示模型缺失，请执行 ollama pull {vmodel}）")
             self._send_json({
                 "error": "Ollama 未运行或未安装。请先安装 Ollama 并启动（详见 README 使用指南），"
-                         "再重试。", "reply": None, "sources": [], "rag_used": False,
+                         "再重试。" + hint_extra,
+                "reply": None, "sources": [], "rag_used": False,
+                "vision": bool(images),
             }, code=200)
             return
+        # RAG：以用户文字作为检索 query（纯图片时可为空）
         context = []
-        if use_rag:
+        if use_rag and message:
             context = rag_context(message, top_k=4)
-        sys_prompt = SYSTEM_PROMPT
+        ctx_block = ""
         if context:
             ctx_text = "\n\n".join(f"[来源 {s}]\n{t}" for s, t in context)
-            sys_prompt += f"\n\n===== 知识库上下文（仅作参考，需工程师核实）=====\n{ctx_text}\n====="
+            ctx_block = f"\n\n===== 知识库上下文（仅作参考，需工程师核实）=====\n{ctx_text}\n====="
+
+        # ---- 有图片：走视觉模型 ----
+        if images:
+            vision_model = payload.get("vision_model") or default_vision_model()
+            user_part = message or "请解析这张工控相关图片。"
+            prompt = (SYSTEM_PROMPT + VISION_PROMPT + ctx_block
+                      + f"\n\n用户问题：{user_part}")
+            try:
+                reply = ollama_vision_generate(vision_model, prompt, images, timeout=180)
+            except urllib.error.HTTPError as e:
+                detail = e.read().decode("utf-8", "replace")[:300] if hasattr(e, "read") else ""
+                hint = ""
+                if "not found" in detail.lower():
+                    hint = f" 视觉模型可能未拉取，请执行：ollama pull {vision_model}"
+                self._send_json({
+                    "error": f"图片解析失败（Ollama 调用失败）: {detail}{hint}",
+                    "reply": None, "sources": [], "rag_used": bool(context),
+                    "vision": True}, code=200)
+                return
+            except Exception as e:
+                self._send_json({
+                    "error": f"图片解析异常: {e}",
+                    "reply": None, "sources": [], "rag_used": bool(context),
+                    "vision": True}, code=200)
+                return
+            self._send_json({
+                "reply": reply,
+                "sources": [s for s, _ in context],
+                "rag_used": bool(context),
+                "model": vision_model,
+                "vision": True,
+            })
+            return
+
+        # ---- 无图片：原文本路径 ----
+        sys_prompt = SYSTEM_PROMPT + ctx_block
         messages = [{"role": "system", "content": sys_prompt}]
         for h in history[-20:]:
             if isinstance(h, dict) and h.get("role") in ("user", "assistant"):
@@ -322,6 +430,7 @@ class Handler(BaseHTTPRequestHandler):
             "sources": [s for s, _ in context],
             "rag_used": bool(context),
             "model": model,
+            "vision": False,
         })
 
     def _handle_search(self, payload):
@@ -374,6 +483,13 @@ INDEX_HTML = """<!DOCTYPE html>
   .input { display:flex; gap:8px; padding:12px 16px; border-top:1px solid #30363d; background:#11161d; }
   .input textarea { flex:1; resize:none; height:48px; background:#21262d; color:#e6e6e6;
          border:1px solid #30363d; border-radius:6px; padding:10px; font-size:14px; }
+  .input textarea.drag { border-color:#1f6feb; }
+  #attach { white-space:nowrap; }
+  .preview { display:flex; align-items:center; gap:8px; padding:6px 16px; background:#11161d;
+         border-top:1px solid #30363d; font-size:12px; color:#9aa4b2; }
+  .preview img { max-height:56px; max-width:120px; border:1px solid #30363d; border-radius:6px; }
+  .msg img.thumb { max-width:220px; max-height:160px; border-radius:8px; margin-bottom:6px; display:block; }
+  .badge { display:inline-block; font-size:11px; padding:1px 6px; border-radius:10px; background:#30363d; color:#9aa4b2; margin-left:6px; }
 </style>
 </head>
 <body>
@@ -389,18 +505,31 @@ INDEX_HTML = """<!DOCTYPE html>
 </div>
 <div id="msgs"></div>
 <div class="input">
-  <textarea id="text" placeholder="输入工控问题，例如：三菱 FX5U 通过 Modbus TCP 读 D100，地址怎么填？"></textarea>
+  <button id="attach" title="上传图片：电气/PLC图纸、程序截图、变频器/伺服/编码器铭牌、HMI画面、报警截图、通用文字">📎 图片</button>
+  <input type="file" id="file" accept="image/*" style="display:none">
+  <textarea id="text" placeholder="输入工控问题；也可点 📎 上传图纸/铭牌/画面截图进行图片解析（Enter 发送，Shift+Enter 换行，支持拖拽图片到输入框）"></textarea>
   <button id="send">发送</button>
+</div>
+<div id="preview" class="preview" style="display:none">
+  <img id="previewImg" alt="待解析图片">
+  <span id="previewName"></span>
+  <span class="badge" id="visionBadge"></span>
+  <button id="clearImg" title="移除图片" style="margin-left:auto">✕</button>
 </div>
 <script>
 const $ = s => document.querySelector(s);
 let history = [];
+let pendingImage = null;   // 已压缩的 dataURL
+let visionModel = '';
 async function health(){
   try{
     const r = await fetch('/api/health'); const j = await r.json();
+    visionModel = j.vision_model || '';
     let txt = j.ollama ? ('Ollama ✓ '+j.ollama_version) : 'Ollama ✗ 未运行';
     txt += j.rag ? ' · 知识库 ✓' : ' · 知识库 ✗(未导入)';
+    txt += j.vision_available ? (' · 视觉✓ '+visionModel) : (' · 视觉✗ 未拉取('+visionModel+')');
     $('#status').textContent = txt;
+    $('#visionBadge').textContent = '图片解析用: '+visionModel + (j.vision_available?'':'（未拉取，上传图片前请先 ollama pull）');
     const sel = $('#model'); sel.innerHTML='';
     (j.models.length?j.models:[j.default_model]).forEach(m=>{
       const o=document.createElement('option'); o.value=m; o.textContent=m; sel.appendChild(o);
@@ -408,21 +537,58 @@ async function health(){
     if(!j.ollama) $('#status').innerHTML='<span class="err">Ollama 未运行：请先安装并启动 Ollama</span>';
   }catch(e){ $('#status').innerHTML='<span class="err">无法连接服务</span>'; }
 }
-function addMsg(role, text, src){
+function addMsg(role, text, src, img, model){
   const d=document.createElement('div'); d.className='msg '+(role==='user'?'user':'bot');
-  d.textContent=text;
+  if(img){ const im=document.createElement('img'); im.src=img; im.className='thumb'; d.appendChild(im); }
+  const sp=document.createElement('span'); sp.textContent=text; d.appendChild(sp);
+  if(role==='bot'&&model){ const b=document.createElement('div'); b.className='src'; b.textContent='模型: '+model; d.appendChild(b); }
   if(src&&src.length){ const s=document.createElement('div'); s.className='src'; s.textContent='来源: '+src.join(', '); d.appendChild(s); }
   $('#msgs').appendChild(d); $('#msgs').scrollTop=$('#msgs').scrollHeight;
 }
+function showPreview(){
+  if(pendingImage){ $('#preview').style.display='flex'; $('#previewImg').src=pendingImage;
+    $('#previewName').textContent='已附加图片（将用视觉模型解析）'; }
+  else { $('#preview').style.display='none'; }
+}
+function loadFile(file){
+  if(!file || !file.type || !file.type.startsWith('image/')) return;
+  const fr=new FileReader();
+  fr.onload=function(){
+    const img=new Image();
+    img.onload=function(){
+      const max=1024; let w=img.width,h=img.height;           // 压缩到最长边 1024，降载荷、加速推理
+      const scale=Math.min(1, max/Math.max(w,h));
+      const c=document.createElement('canvas');
+      c.width=Math.max(1,Math.round(w*scale)); c.height=Math.max(1,Math.round(h*scale));
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      pendingImage=c.toDataURL('image/jpeg',0.85);
+      showPreview();
+    };
+    img.onerror=function(){ alert('图片读取失败，请换一张试试'); };
+    img.src=fr.result;
+  };
+  fr.readAsDataURL(file);
+}
+$('#attach').onclick=()=>$('#file').click();
+$('#file').addEventListener('change',e=>{ if(e.target.files&&e.target.files[0]) loadFile(e.target.files[0]); $('#file').value=''; });
+$('#clearImg').onclick=()=>{ pendingImage=null; showPreview(); };
+const ta=$('#text');
+ta.addEventListener('dragover',e=>{ e.preventDefault(); ta.classList.add('drag'); });
+ta.addEventListener('dragleave',()=>ta.classList.remove('drag'));
+ta.addEventListener('drop',e=>{ e.preventDefault(); ta.classList.remove('drag'); if(e.dataTransfer.files&&e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
 async function send(){
-  const text=$('#text').value.trim(); if(!text) return;
-  addMsg('user', text); history.push({role:'user',content:text}); $('#text').value='';
+  const text=$('#text').value.trim();
+  if(!text && !pendingImage) return;
+  const img=pendingImage;
+  addMsg('user', text||'（请解析这张图片）', null, img);
+  history.push({role:'user', content: text || '[上传了一张工控图片]'});
+  $('#text').value=''; pendingImage=null; showPreview();
   try{
     const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({message:text,history,model:$('#model').value,rag:$('#rag').checked})});
+      body:JSON.stringify({message:text,history,model:$('#model').value,rag:$('#rag').checked, images: img?[img]:[]})});
     const j=await r.json();
     if(j.error && !j.reply){ addMsg('bot', j.error, null); $('#status').innerHTML='<span class="err">'+j.error+'</span>'; return; }
-    addMsg('bot', j.reply||'(无回复)', j.sources||[]);
+    addMsg('bot', j.reply||'(无回复)', j.sources||[], null, j.model);
     if(j.reply) history.push({role:'assistant',content:j.reply});
   }catch(e){ addMsg('bot', '请求失败: '+e, null); }
 }

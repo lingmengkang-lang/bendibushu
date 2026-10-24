@@ -30,6 +30,7 @@ REQUIRED_FILES = [
     "README.md",
     "requirements.txt",
     "config/ollama-models.txt",
+    "config/ollama-vision-model.txt",
     "config/rag.config.json",
     "scripts/rag_manager.py",
     "scripts/start.ps1",
@@ -46,6 +47,7 @@ REQUIRED_FILES = [
     "docs/plc/brands.md",
     "docs/plc/hmi_scada_host.md",
     "docs/plc/how_to_extend.md",
+    "docs/plc/image_parsing.md",
     "docs/plc/brand_onboarding_template.md",
 ]
 

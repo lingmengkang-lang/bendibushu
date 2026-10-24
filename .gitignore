@@ -36,3 +36,6 @@ Thumbs.db
 *credentials*.json
 *.token
 .cnb/
+
+# ===== 打包产物（package.ps1 输出，不入库）=====
+releases/

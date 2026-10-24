@@ -96,6 +96,22 @@ Write-Host ("   模型: {0}" -f $model)
 if ($LASTEXITCODE -ne 0) { Write-Warn ("模型拉取失败（网络/磁盘？）。可稍后手动: ollama pull {0}" -f $model) }
 else { Write-Ok ("模型就绪: {0}" -f $model) }
 
+# ---------- 4b. 拉取视觉/图片解析模型（best-effort，用于“看图”）----------
+Write-Step "拉取视觉/图片解析模型（可选，首次较大）..."
+$vmodel = "qwen2.5vl:7b"
+$vf = Join-Path $root "config\ollama-vision-model.txt"
+if (Test-Path $vf) {
+    foreach ($line in Get-Content $vf) {
+        $t = $line.Trim()
+        if (-not $t -or $t.StartsWith("#")) { continue }
+        $vmodel = ($t -split "#")[0].Trim(); break
+    }
+}
+Write-Host ("   视觉模型: {0}" -f $vmodel)
+& ollama pull $vmodel
+if ($LASTEXITCODE -ne 0) { Write-Warn ("视觉模型拉取失败（网络/磁盘？）。图片解析功能暂不可用；可稍后手动: ollama pull {0}" -f $vmodel) }
+else { Write-Ok ("视觉模型就绪: {0}" -f $vmodel) }
+
 # ---------- 5. 导入知识库（best-effort）----------
 Write-Step "导入知识库（best-effort，首次可能需联网下载嵌入模型）..."
 try {
