@@ -1,14 +1,48 @@
-# 这里是一个示例 .cnb.yml
-  
-  # 匹配main分支
-  main:
-    # 触发事件为 push 事件
-    push:
-      # 这里是阶段任务示例，可配置任意多个阶段，这里以一个阶段为例
-      - name: "your first CNB building"
-        stages:
-          # 使用流水线输出你的构建配置数据
-          - name: echo your build data
-            script: echo ${CNB_BUILD_USER} 通过 ${CNB_BRANCH} 分支触发了 ${CNB_EVENT} 事件
-  
-  # 更多资料见 https://docs.cnb.cool/build/quick-start.html
+# ============================================================================
+# .cnb.yml — local-offline-assistant CNB 流水线
+# 语法文档: https://docs.cnb.cool/zh/build/grammar.html
+# 自托管构建节点: https://docs.cnb.cool/zh/build/build-node.html
+#
+# 两条流水线：
+#   1) validate-repo  跑在 CNB 云端节点，只做仓库结构校验（不碰你的机器）
+#   2) setup-ollama   跑在你注册的【自托管 Windows 构建节点】上，
+#                     负责把 Ollama + 模型装到你的电脑，用的是你本机的网络
+#
+# 为什么必须自托管：CNB 云端节点是临时构建机，装完即销毁，也访问不到你的
+#   D:\ 盘。要"让平台自动助手把引擎装到本机"，就得把你的机器注册成构建节点。
+#   注册步骤见 docs/deploy/ollama_setup.md。
+#
+# 注意：未注册 Windows 节点时，流水线 2 会因"无可用节点"而失败，
+#       故对整条流水线设置 allowFailure: true，避免拖红流水线 1 的结论。
+# ============================================================================
+
+main:
+  push:
+    # ---------- 流水线 1：云端仓库结构校验 ----------
+    - name: validate-repo
+      runner:
+        tags:
+          - cnb:arch:amd64
+      docker:
+        image: python:3.12-slim
+      stages:
+        - name: 校验仓库结构
+          script: |
+            python --version
+            python scripts/ci_validate.py
+
+    # ---------- 流水线 2：在你自己的 Windows 构建节点上安装 Ollama ----------
+    - name: setup-ollama-on-windows-node
+      allowFailure: true
+      runner:
+        # namespace: group 表示使用"当前仓库所属根组织"下的自托管构建节点
+        namespace: group
+        tags:
+          # 节点标签为超集即可命中；例如你给节点打 [windows, win11] 也能命中这里
+          - windows
+      stages:
+        - name: 安装 Ollama 并拉取模型
+          # 注：自托管 Windows 节点上，stage script 默认走 PowerShell
+          script: |
+            Write-Host "节点: $env:COMPUTERNAME"
+            .\scripts\setup_ollama.ps1

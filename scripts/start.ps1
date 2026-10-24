@@ -79,7 +79,8 @@ Write-Host ("  Ollama  (11434): {0}" -f $s11434)
 Write-Host ("  WebUI   ( 7860): {0}" -f $s7860)
 Write-Host ""
 Write-Host "下一步提示：" -ForegroundColor Cyan
-Write-Host "  1) 拉取模型（首次必须，清单见 config\ollama-models.txt）: ollama pull qwen2.5:7b"
-Write-Host "  2) 导入知识库: python scripts\rag_manager.py add data\knowledge_base\docs -r"
-Write-Host "  3) 检索测试  : python scripts\rag_manager.py search ""测试问题"""
-Write-Host "  4) 停止服务  : .\scripts\stop.ps1"
+Write-Host "  1) 安装引擎+拉取模型（首次必须，幂等可反复跑）: .\scripts\setup_ollama.ps1"
+Write-Host "     或手动: ollama pull qwen2.5:14b （清单见 config\ollama-models.txt）"
+Write-Host "  2) 一键导入知识库: python scripts\rag_manager.py add-all"
+Write-Host "  3) 检索测试      : python scripts\rag_manager.py search ""三菱FX5U Modbus 地址"""
+Write-Host "  4) 停止服务      : .\scripts\stop.ps1"

@@ -59,7 +59,7 @@
 - 故障排查、联锁与急停逻辑、PID 整定等经验性问题的离线检索。
 
 **边界声明（重要）**：
-- 本工程是**部署与配置工程**，不含模型文件、不自动拉取模型（Ollama 模型需你手动 `ollama pull`）；
+- 本工程是**部署与配置工程**，仓库不含模型文件；模型可由 `scripts/setup_ollama.ps1` 或 CI 自动拉取（见 `docs/deploy/ollama_setup.md`），也可你手动 `ollama pull`；
 - 知识库、日志、向量库等运行时数据均被 `.gitignore` 排除，仓库只含代码与配置；
 - AI 生成的 PLC / 工控代码**仅供起草与教学**，必须经由合格工程师审核并在仿真中验证（见 `docs/plc/SAFETY.md`）；
 - LoRA 微调使用 HuggingFace/ModelScope 格式模型，与 Ollama 的 gguf 格式**不通用**（详见 `lora/README.md`）。
@@ -73,17 +73,23 @@ local-offline-assistant/
 ├── .gitignore                      运行时数据排除规则
 ├── LICENSE                         MIT 许可证
 ├── config/
-│   ├── rag.config.json             RAG 参数（向量库/嵌入/分块/支持格式）
-│   ├── ollama-models.txt           推荐模型清单（含 24G+CPU 卸载指引，不自动拉取）
+│   ├── rag.config.json             RAG 参数（向量库/嵌入/分块/支持格式/知识目录）
+│   ├── ollama-models.txt           推荐模型清单（含 24G+CPU 卸载指引）
 │   └── workbuddy/
 │       ├── mcp.fragment.json       WorkBuddy MCP 接入配置片段
 │       └── knowledge-base.md       接入说明 + 知识库结构
+├── .github/
+│   └── workflows/
+│       └── setup-ollama.yml        GitHub Actions：云端校验 + 自托管节点装 Ollama/模型
+├── .cnb.yml                        CNB 流水线：云端校验 + 自托管 Windows 节点装 Ollama/模型
 ├── deploy/
 │   └── install.ps1                 一键部署脚本
 ├── scripts/
 │   ├── start.ps1 / stop.ps1        服务启停（PID 文件精准停止，防误杀）
+│   ├── setup_ollama.ps1            安装 Ollama + 拉模型（幂等；两平台 CI 共用）
 │   ├── selfcheck.ps1               环境自检（PASS/WARN/FAIL 分级）
-│   ├── rag_manager.py              RAG 管理：add/search/list/stats/clear
+│   ├── ci_validate.py              仓库结构校验（云端 CI 门禁，零依赖）
+│   ├── rag_manager.py              RAG 管理：add/add-all/scan/search/list/stats/clear
 │   └── history_manager.ps1         历史记录管理：status/archive/export/clean
 ├── lora/
 │   ├── README.md                   微调说明（含模型格式区别，可选组件）
@@ -92,42 +98,54 @@ local-offline-assistant/
 │   ├── configs/qlora_sft.yaml      QLoRA 配置模板
 │   └── dataset/                    数据集注册 + alpaca 示例数据
 ├── docs/
-│   └── plc/                        工控应用资料（本工程全部重心）
-│       ├── SAFETY.md               安全红线（必读）
-│       ├── st_template.st          IEC 61131-3 ST 示例集（厂商中立）
-│       ├── rag_guide.md            把厂家手册/程序喂进 RAG 的指引
-│       ├── brands.md               多品牌对照 + HMI/编码器速查
-│       ├── commissioning.md        变频器/伺服/触摸屏/编码器/组态软件/上位机调试检查清单
-│       ├── hmi_scada_host.md       组态软件(组态王/MCGS/台达/WinCC)与上位机程序编写指引
-│       └── sample_plc_doc.md       知识库示例样板（也可作 RAG 导入测试）
+│   ├── plc/                        工控应用资料（本工程全部重心）
+│   │   ├── SAFETY.md               安全红线（必读）
+│   │   ├── st_template.st          IEC 61131-3 ST 示例集（厂商中立）
+│   │   ├── rag_guide.md            把厂家手册/程序喂进 RAG 的指引
+│   │   ├── brands.md               多品牌对照 + HMI/编码器速查
+│   │   ├── commissioning.md        六类调试检查清单
+│   │   ├── hmi_scada_host.md       组态软件与上位机程序编写指引
+│   │   ├── how_to_extend.md        ⭐ 如何随时增加应用场景（新品牌/新器件）
+│   │   ├── brand_onboarding_template.md  ⭐ 品牌/器件接入骨架模板（填空即用）
+│   │   └── sample_plc_doc.md       知识库示例样板（也可作 RAG 导入测试）
+│   ├── scada/                      ⭐ 组态软件 TOP5 自动编程能力（组态王/MCGS/WinCC/力控/威纶通）
+│   ├── host/                       上位机程序样例（你自己持续补充）
+│   ├── devices/                    ⭐ 常用电气件使用方法（你自己持续补充）
+│   └── deploy/
+│       └── ollama_setup.md         ⭐ 让 GitHub/CNB 自动帮你装 Ollama+模型（自托管节点）
 └── data/ logs/ models/ lora/output/   运行时目录（部署时自动创建，不入库）
 ```
 
 ## 四、快速开始（新机器 5 步）
 
 ```powershell
-# 0. 前置：安装 Python 3.10+（python.org，勾选 Add to PATH）；
-#    可选安装 Ollama（https://ollama.com/download），或让 install.ps1 用 winget 尝试安装
+# 0. 前置：安装 Python 3.10+（python.org，勾选 Add to PATH）
 git clone <你的仓库地址> local-offline-assistant
 cd local-offline-assistant
 
-# 1. 一键部署（创建 venv、装依赖、建目录、跑自检；不自动装 Ollama、不拉模型）
+# 1. 一键部署（创建 venv、装依赖、建目录、跑自检）
 .\deploy\install.ps1
 #   想自动尝试 winget 装 Ollama：.\deploy\install.ps1 -InstallOllama
 
-# 2. 启动服务（新开终端，刷新 PATH）
+# 2. 安装 Ollama 引擎 + 拉取模型（幂等，可反复跑；也可交给 CI 做，见下一步）
+.\scripts\setup_ollama.ps1
+#   只拉指定模型：.\scripts\setup_ollama.ps1 -Models "qwen2.5:14b,nomic-embed-text"
+
+# 3. 启动服务
 .\scripts\start.ps1
 
-# 3. 拉取模型（首次必须；工控专业场景建议 14B，见 config\ollama-models.txt）
-ollama pull qwen2.5:14b
-
-# 4. 导入知识库并验证（把你们的厂家手册/程序脱敏后放进 data\knowledge_base\docs\）
-python scripts\rag_manager.py add data\knowledge_base\docs -r
+# 4. 一键导入知识库并验证（把你们的厂家手册/程序脱敏后放进 data\knowledge_base\docs\）
+python scripts\rag_manager.py add-all
+python scripts\rag_manager.py scan
 python scripts\rag_manager.py search "西门子 S7-1200 高速计数器怎么配" --top-k 5
 
 # 5. 接入 WorkBuddy（可选）
 #    按 config\workbuddy\knowledge-base.md 合并 mcp.fragment.json 到 ~/.workbuddy/mcp.json
 ```
+
+> **不想自己动手装 Ollama？** 把你的机器注册成 GitHub 自托管 runner 或 CNB 自托管
+> Windows 构建节点，之后在网页上点一下「Run workflow」，两个平台就会自动把
+> Ollama + 模型装到你本机。完整步骤见 `docs/deploy/ollama_setup.md`。
 
 常用运维命令：环境自检 `.\scripts\selfcheck.ps1`｜停止服务 `.\scripts\stop.ps1`｜日志归档 `.\scripts\history_manager.ps1 archive`。
 
@@ -149,6 +167,7 @@ python scripts\rag_manager.py search "西门子 S7-1200 高速计数器怎么配
 | `stop.ps1` 停止进程 | 误杀风险 | 只停 PID 文件记录且进程名校验通过的进程；无 PID 文件不自动杀 |
 | `install.ps1 -RecreateVenv` | 删除重建 venv | 需显式传参 |
 | `install.ps1 -InstallOllama` | 联网安装 + 可能弹 UAC | 需显式传参，默认仅检测引导 |
+| **注册自托管 runner / 构建节点** | **流水线可在你机器上执行任意代码**（公开仓库尤甚） | GitHub 侧默认仅 `workflow_dispatch` 触发；建议私有仓库或限制推送权限；不要把 token 写进仓库 |
 | **PLC / 工控代码 / HMI / 组态软件 / 上位机 / 编码器配置** | **错误程序可能导致设备损坏/伤人** | **AI 输出仅作起草，必须工程师审核 + 仿真验证（见 `docs/plc/SAFETY.md`）** |
 
 **生产/重要机器上执行任何删除类操作前，请先备份 `data/` 与 `logs/` 目录。**
@@ -162,7 +181,16 @@ A：**能办到"起草"，不能办到"全自动代写"。** 本助手可为各�
 A：Ollama 用 gguf 格式，LLaMA-Factory 训练用 HuggingFace/ModelScope 格式。训练产物需合并 LoRA 后按双方官方文档转换才能在 Ollama 使用【⚠️转换命令随版本变化，以官方文档为准】。
 
 **Q：完全离线的机器能用吗？**
-A：可以，但有一次"联网预热"：Chroma 默认嵌入方式首次运行会自动下载 ONNX 模型权重。完全无网的机器请预先在联网机器下载放置，或切换 `provider=ollama` 用本地 Ollama 嵌入模型（见 `config/workbuddy/knowledge-base.md`）。
+A：可以，但有一次"联网预热"：Chroma 默认嵌入方式首次运行会自动下载 ONNX 模型权重。完全无网的机器请预先在联网机器下载放置，或切换 `provider=ollama` 用本地 Ollama 嵌入模型（见 `config/workbuddy/knowledge-base.md`、`docs/plc/rag_guide.md` 第 4.1 节）。
+
+**Q：能不能让 GitHub / CNB 的自动运行助手帮我装 Ollama 和模型？**
+A：**能，但要先把你的机器注册成"自托管节点"。** 两家的云端 runner 都是临时云机器，装完即销毁、也摸不到你的 `D:\` 盘；只有把本机注册成 GitHub 自托管 runner 或 CNB 自托管 Windows 构建节点，流水线才会在你机器上执行安装。本工程已配好两条流水线（`.github/workflows/setup-ollama.yml`、`.cnb.yml`），共用同一个幂等脚本 `scripts/setup_ollama.ps1`。⚠️ 公开仓库 + 自托管 runner 有安全风险（他人推代码即可在你机器执行），GitHub 侧已默认只允许网页手动触发。完整步骤见 `docs/deploy/ollama_setup.md`。
+
+**Q：我想再加一个 PLC 品牌，或者加一个我常用的电气件，怎么办？**
+A：**不用改代码，加文档就行。** 复制 `docs/plc/brand_onboarding_template.md` 的模板 → 填空 → 放进 `docs/devices/`（器件）或 `docs/plc/brands/<品牌>.md` → 跑一次 `python scripts\rag_manager.py add-all`。之后问 AI 相关问题，它就会引用你核对过的映射表和用法，而不是凭记忆编。详见 `docs/plc/how_to_extend.md`。
+
+**Q：组态软件覆盖了哪些？**
+A：锁定国内使用率 TOP5 深度支持——**组态王、MCGS（昆仑通态）、WinCC、力控、威纶通 EBPro**，每个都有专门的"AI 自动编程能力"文档（变量点表、设备配置、脚本、画面清单、提示词模板），见 `docs/scada/`。台达 DIAEntegro、紫金桥、inTouch/iFIX、Ignition 等在 `docs/scada/second_tier.md`。
 
 **Q：没有 NVIDIA 显卡？**
 A：Ollama 可 CPU 推理 7B（慢但可用）；LoRA 训练 7B 在 CPU 上基本不可行，仅建议用于跑通流程。
@@ -182,9 +210,29 @@ A：7B 偏弱、易幻觉；建议至少 **14B**（24G 内存可舒适跑）。�
 - **brands.md** — 多品牌软件/语言对照速查 + HMI/触摸屏、编码器要点；
 - **commissioning.md** — 变频器/伺服/触摸屏(HMI)/编码器/组态软件/上位机 六类调试检查清单；
 - **hmi_scada_host.md** — 组态软件（组态王/MCGS/台达 DIAEntegro/WinCC/力控等）与上位机程序编写（C#/Python/LabVIEW）指引、协议与示例代码；
+- **how_to_extend.md** — ⭐ 如何随时增加应用场景（新 PLC 品牌 / 新电气件 / 新样例），三步即可；
+- **brand_onboarding_template.md** — ⭐ 品牌/器件接入骨架模板，填空后 AI 即可按它"自动部署"；
 - **sample_plc_doc.md** — 知识库资料整理样板（也可作 RAG 导入测试样例）。
 
-## 九、信息来源与存疑标注汇总
+**组态软件 TOP5 自动编程能力**（`docs/scada/`）：组态王、MCGS（昆仑通态）、WinCC、力控、威纶通 EBPro 各一份文档，
+每份含"AI 能自动产出什么 + 变量点表 + 脚本样例 + 画面清单 + 提示词模板"；
+第二梯队（台达 DIAEntegro、紫金桥、inTouch/iFIX、Ignition 等）见 `docs/scada/second_tier.md`。
+
+**持续扩充**：`docs/devices/`（常用电气件使用方法）、`docs/host/`（上位机程序样例）由你按模板不断新增。
+
+## 九、自动化：让两个平台替你装引擎、做校验
+
+| 平台 | 流水线 | 运行位置 | 作用 |
+|---|---|---|---|
+| GitHub | `validate` | 云端 ubuntu-latest | 仓库结构校验（`scripts/ci_validate.py`），公开仓库也安全 |
+| GitHub | `setup-ollama` | **你的 Windows 本机**（自托管 runner） | 装 Ollama + 拉模型；默认仅网页手动触发 |
+| CNB | `validate-repo` | 云端 amd64 | 仓库结构校验 |
+| CNB | `setup-ollama-on-windows-node` | **你的 Windows 本机**（自托管构建节点） | 装 Ollama + 拉模型 |
+
+两平台共用 `scripts/setup_ollama.ps1`（幂等：已装的跳过、已拉的模型跳过）。
+注册自托管节点与安全注意事项见 `docs/deploy/ollama_setup.md`。
+
+## 十、信息来源与存疑标注汇总
 
 本仓库内容按三类来源组织：
 
@@ -193,8 +241,11 @@ A：7B 偏弱、易幻觉；建议至少 **14B**（24G 内存可舒适跑）。�
   1. `mcp.fragment.json` 中的 MCP 服务器 command/args（第三方实现需自行评估选型）；
   2. `ollama-models.txt` 中各模型在 Ollama library 的实际可用性与显存经验值；
   3. LLaMA-Factory 配置字段与训练产物转 Ollama 的具体命令（以双方官方文档为准）；
-  4. PyTorch/CUDA 组合命令（以 pytorch.org 当前页面为准）。
+  4. PyTorch/CUDA 组合命令（以 pytorch.org 当前页面为准）；
+  5. GitHub Actions runner 下载版本号（以仓库 Settings → Runners 页面当前显示的为准）；
+  6. CNB 自托管节点的接入脚本与标签（以组织设置 → 构建节点 → 连接指引弹窗显示的为准）；
+  7. `docs/scada/`、`docs/devices/` 中各品牌脚本语法与寄存器地址（随版本变化，必须按你所用版本手册核对）。
 
-## 十、许可
+## 十一、许可
 
 仓库采用 **MIT 许可证**（`LICENSE` 文件）。公开仓库，可自由使用、修改、分发，但按 MIT 条款须保留版权与许可声明；不提供任何担保。

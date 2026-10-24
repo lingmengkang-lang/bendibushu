@@ -26,21 +26,49 @@ RAG（检索增强）让模型在回答时引用你提供的手册、样本与�
 优先用 **Markdown**：结构清晰、分块检索效果更好。
 
 ## 三、导入与验证
+
+本工程已把知识目录配好（见 `config/rag.config.json` 的 `knowledge_dirs`），
+新增场景文档放进去后**一条命令即可全部入库**：
+
 ```powershell
-# 1) 把资料放好后，建立/更新向量库（递归 -r 含子目录）
-python scripts\rag_manager.py add data\knowledge_base\docs -r
+# 1) 一键导入所有知识目录（新增 PLC 品牌/电气件/组态样例后用这个）
+python scripts\rag_manager.py add-all
 
-# 2) 检索验证（用工控相关提问）
-python scripts\rag_manager.py search "西门子 S7-1200 怎么配置高速计数器" --top-k 5
+# 2) 确认没有漏入库的文件
+python scripts\rag_manager.py scan
 
-# 3) 查看集合统计
+# 3) 检索验证（用工控相关提问）
+python scripts\rag_manager.py search "组态王 命令语言 定时 计时" --top-k 5
+
+# 4) 查看集合统计
 python scripts\rag_manager.py stats
 ```
 
+> 只导单个目录/文件时仍可用：`python scripts\rag_manager.py add <路径> -r`
+
 ## 四、配置要点（见 config/rag.config.json）
 - `chunk_size` / `chunk_overlap`：手册类长文档建议 500/50，避免截断语义；
-- `provider`：默认 `chroma-default`（首次需联网下载 ONNX 嵌入权重）；
+- `knowledge_dirs`：`add-all` / `scan` 按此列表走；**新建目录后加到这里**；
+- `provider`：默认 `chroma-default`（首次需联网下载 ONNX 嵌入权重，约 80MB）；
   完全离线机器请切 `ollama` 用本地嵌入模型（见 `config/workbuddy/knowledge-base.md`）。
+
+### 4.1 ⚠️ 首次运行要联网下载嵌入模型（实测踩坑）
+
+`chroma-default` 用的是 `all-MiniLM-L6-v2`，**第一次执行 add/search 会自动下载约 80MB 的
+ONNX 权重**到 `%USERPROFILE%\.cache\chroma\onnx_models\`，之后才真正离线。
+
+如果本机下载不了（表现为卡在 `onnx.tar.gz` 反复重试、最后报
+`The read operation timed out in upsert`），三种解法：
+
+1. **换本地嵌入模型（推荐，顺便把 Ollama 用起来）**：把 `config/rag.config.json` 的
+   `embedding.provider` 改成 `ollama`，并先 `ollama pull nomic-embed-text`（`setup_ollama.ps1` 会自动拉）。
+2. **预置缓存**：在能联网的机器上下载好权重，把整个
+   `%USERPROFILE%\.cache\chroma\onnx_models\all-MiniLM-L6-v2` 目录拷到本机同路径。
+3. **清掉半截文件再重试**：下载中断会留下不完整的 `onnx.tar.gz`，删掉它再在好网络下重跑
+   （残留文件会被误判为"已缓存"而报损坏）。
+
+> 换 `provider: ollama` 后，向量库里的已有向量与新嵌入模型**不兼容**，需要
+> `rag_manager.py clear` 后重新 `add-all`。
 
 ## 五、注意事项
 - **不要**把涉密/隐私信息提交进 Git 仓库（这些文件已被 `.gitignore` 排除，不会入库）；

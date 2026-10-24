@@ -1,7 +1,9 @@
 # Ollama 推荐模型清单（PLC / 工控离线助手）
-# 说明：本文件只是清单，install.ps1 / start.ps1 不会自动拉取任何模型（尊重"只做工程产出"约定）。
+# 说明：本文件是模型清单。两种拉取方式：
+#       1) 自动（推荐）：.\scripts\setup_ollama.ps1   —— 会按本文件自动安装 Ollama 并拉取下列未注释模型
+#          （GitHub Actions / CNB 的自托管节点流水线也调用同一脚本，见 docs\deploy\ollama_setup.md）
+#       2) 手动：ollama pull qwen2.5:14b
 #       实际可用模型以 Ollama 官方 library 页面为准：https://ollama.com/library
-#       手动拉取示例：ollama pull qwen2.5:14b
 #
 # ---------- 推理模型（按显存+内存选一；CPU 卸载可突破显存限制，代价是速度）----------
 qwen2.5:7b        # 最低门槛，24G 内存可 CPU 卸载跑；但 PLC 专业题偏弱，仅适合跑通流程

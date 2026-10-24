@@ -5,10 +5,18 @@ rag_manager.py — local-offline-assistant RAG 知识库管理脚本
 
 子命令：
   add <path> [--recursive]   导入文件或目录到 Chroma 向量库（幂等：同内容不重复入库）
+  add-all                    一键导入所有知识目录（config/rag.config.json 的 knowledge_dirs）
   search <query> [--top-k N] 语义检索
   list                       列出已导入的源文件
+  scan [-a]                  扫描知识目录，标出哪些文件尚未入库（-a 也显示已入库的）
   stats                      查看集合统计
   clear [--yes]              清空向量库集合（高危，默认需交互确认）
+
+新增应用场景（PLC 品牌 / 电气件 / 上位机 / 组态样例）：
+  1) 把文档放进 docs/plc、docs/scada、docs/host、docs/devices 或 data/knowledge_base/docs
+  2) python scripts/rag_manager.py add-all
+  3) python scripts/rag_manager.py scan    # 确认没有漏入库
+  详见 docs/plc/how_to_extend.md
 
 依赖：chromadb（PDF 支持另需 pypdf）
 运行环境：Python 3.10+，在工程根目录或任意目录执行均可（自动定位工程根）
@@ -100,26 +108,33 @@ def chunk_text(text: str, size: int, overlap: int) -> list:
     return chunks
 
 
-def cmd_add(args, cfg):
-    target = Path(args.path)
-    if not target.is_absolute():
-        target = ROOT / target
-    if not target.exists():
-        print(f"[FAIL] 路径不存在: {target}")
-        sys.exit(1)
+# ---------- 知识目录（新增应用场景就放这里，add-all 会全部导入） ----------
+DEFAULT_KNOWLEDGE_DIRS = [
+    "data/knowledge_base/docs",  # 你自己的手册/样本/程序（脱敏后）
+    "docs/plc",                  # PLC / 伺服 / 变频 / 编码器 / 安全
+    "docs/scada",                # 组态软件 TOP5 与第二梯队
+    "docs/host",                 # 上位机程序样例
+    "docs/devices",              # 常用电气件使用方法（你持续新增的）
+    "docs/deploy",               # 部署 / CI / Ollama 安装说明
+]
 
-    files = []
+
+def collect_files(target: Path, recursive: bool, cfg: dict) -> list:
+    """把目标（文件或目录）展开为可导入的文件列表"""
     if target.is_file():
-        files = [target]
-    elif target.is_dir():
-        pattern = "**/*" if args.recursive else "*"
+        return [target]
+    files = []
+    if target.is_dir():
+        pattern = "**/*" if recursive else "*"
+        exts = [e.lower() for e in cfg["supported_ext"]]
         for p in sorted(target.glob(pattern)):
-            if p.is_file() and p.suffix.lower() in [e.lower() for e in cfg["supported_ext"]]:
+            if p.is_file() and p.suffix.lower() in exts:
                 files.append(p)
-    if not files:
-        print("[WARN] 未找到可导入的文件（检查 supported_ext 与 --recursive）")
-        return
+    return files
 
+
+def do_import(files, cfg: dict) -> tuple:
+    """把文件列表导入向量库，返回 (added, skipped, failed)"""
     client = get_client(cfg)
     ef = get_embedding_fn(cfg)
     collection = client.get_or_create_collection(
@@ -153,8 +168,102 @@ def cmd_add(args, cfg):
             failed += 1
             print(f"[ERR] {fp.name}: {e}")
 
-    total = collection.count()
+    return added, skipped, failed
+
+
+def collection_count(cfg: dict) -> int:
+    """查询当前集合块数；集合不存在时返回 0"""
+    try:
+        client = get_client(cfg)
+        return client.get_collection(name=cfg["chroma"]["collection"]).count()
+    except Exception:
+        return 0
+
+
+def cmd_add(args, cfg):
+    target = Path(args.path)
+    if not target.is_absolute():
+        target = ROOT / target
+    if not target.exists():
+        print(f"[FAIL] 路径不存在: {target}")
+        sys.exit(1)
+
+    files = collect_files(target, args.recursive, cfg)
+    if not files:
+        print("[WARN] 未找到可导入的文件（检查 supported_ext 与 --recursive）")
+        return
+
+    added, skipped, failed = do_import(files, cfg)
+    total = collection_count(cfg)
     print(f"\n完成：新增/更新 {added} 块，跳过 {skipped} 个文件，失败 {failed} 个。集合当前共 {total} 块。")
+    if failed:
+        sys.exit(1)
+
+
+def cmd_add_all(args, cfg):
+    """一键导入所有知识目录（新增应用场景后用这个）"""
+    dirs = cfg.get("knowledge_dirs") or DEFAULT_KNOWLEDGE_DIRS
+    print("将导入以下知识目录（不存在则跳过）：")
+    for d in dirs:
+        print(f"  - {d}")
+    print("")
+
+    total_added = total_skipped = total_failed = 0
+    for d in dirs:
+        p = ROOT / d
+        if not p.is_dir():
+            print(f"[SKIP] 目录不存在: {d}")
+            continue
+        files = collect_files(p, True, cfg)
+        if not files:
+            print(f"[SKIP] 无可导入文件: {d}")
+            continue
+        print(f"===== 导入目录: {d} =====")
+        a, s, f = do_import(files, cfg)
+        total_added += a
+        total_skipped += s
+        total_failed += f
+
+    total = collection_count(cfg)
+    print(f"\n全部完成：新增/更新 {total_added} 块，跳过 {total_skipped} 个文件，失败 {total_failed} 个。")
+    print(f"集合当前共 {total} 块。")
+    if total_failed:
+        sys.exit(1)
+
+
+def cmd_scan(args, cfg):
+    """扫描知识目录，标出哪些文件尚未入库（新增文档后确认有没有漏导）"""
+    dirs = cfg.get("knowledge_dirs") or DEFAULT_KNOWLEDGE_DIRS
+    exts = [e.lower() for e in cfg["supported_ext"]]
+    try:
+        client = get_client(cfg)
+        collection = client.get_collection(name=cfg["chroma"]["collection"])
+        data = collection.get(include=["metadatas"])
+        imported = {m.get("source", "?") for m in data["metadatas"]}
+    except Exception:
+        imported = set()
+        print("[WARN] 向量库为空或集合不存在，所有文件都视为未导入。\n")
+
+    n_new = n_done = 0
+    for d in dirs:
+        p = ROOT / d
+        if not p.is_dir():
+            continue
+        for fp in sorted(p.rglob("*")):
+            if not fp.is_file() or fp.suffix.lower() not in exts:
+                continue
+            rel = str(fp.relative_to(ROOT))
+            if rel in imported:
+                n_done += 1
+                if args.all:
+                    print(f"[已入库] {rel}")
+            else:
+                n_new += 1
+                print(f"[未入库] {rel}")
+
+    print(f"\n扫描完成：已入库 {n_done} 个，未入库 {n_new} 个。")
+    if n_new:
+        print("导入命令: python scripts/rag_manager.py add-all")
 
 
 def cmd_search(args, cfg):
@@ -228,19 +337,25 @@ def main():
     p_add.add_argument("path", help="文件或目录路径（相对路径基于工程根目录）")
     p_add.add_argument("--recursive", "-r", action="store_true", help="目录递归导入")
 
+    sub.add_parser("add-all", help="一键导入所有知识目录（新增应用场景后用这个）")
+
     p_search = sub.add_parser("search", help="语义检索")
     p_search.add_argument("query", help="查询文本")
     p_search.add_argument("--top-k", type=int, default=5)
 
     sub.add_parser("list", help="列出已导入源文件")
+
+    p_scan = sub.add_parser("scan", help="扫描知识目录，标出未入库文件")
+    p_scan.add_argument("--all", "-a", action="store_true", help="同时显示已入库的文件")
+
     sub.add_parser("stats", help="集合统计")
     p_clear = sub.add_parser("clear", help="清空集合（高危）")
     p_clear.add_argument("--yes", action="store_true", help="跳过交互确认")
 
     args = parser.parse_args()
     cfg = load_config()
-    {"add": cmd_add, "search": cmd_search, "list": cmd_list,
-     "stats": cmd_stats, "clear": cmd_clear}[args.cmd](args, cfg)
+    {"add": cmd_add, "add-all": cmd_add_all, "search": cmd_search, "list": cmd_list,
+     "scan": cmd_scan, "stats": cmd_stats, "clear": cmd_clear}[args.cmd](args, cfg)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,99 @@
+name: setup-ollama
+
+# ============================================================================
+# 本地离线 AI 助手（工控）— Ollama 引擎安装 / 模型拉取流水线
+#
+# 设计要点（重要，先读再改）：
+#
+# 1) validate job 跑在 GitHub 托管的 ubuntu-latest（临时云机器，安全），
+#    只做仓库结构校验，不碰你的机器。
+#
+# 2) setup-ollama job 跑在【自托管 Windows runner】上，也就是你自己的电脑。
+#    只有它能把 Ollama + 模型真正装到你的 D:\ 盘。
+#    注册方法见 docs/deploy/ollama_setup.md。
+#
+# 3) 安全红线：本仓库是公开仓库。公开仓库 + 自托管 runner 是危险组合——
+#    任何能推分支/提 PR 的人都能让你的机器执行任意代码。
+#    因此 setup-ollama job 默认【只允许 workflow_dispatch 手动触发】。
+#    若你确认只在受控环境使用，可自行放开下面 job 的 if 条件。
+# ============================================================================
+
+on:
+  # 手动触发：Actions 页面 → setup-ollama → Run workflow
+  workflow_dispatch:
+    inputs:
+      models:
+        description: "要拉取的模型（逗号分隔；留空则按 config/ollama-models.txt）"
+        required: false
+        default: ""
+      skip_pull:
+        description: "只装引擎不拉模型（true/false）"
+        required: false
+        default: "false"
+
+  # 这些文件变化时自动跑【仅云端 validate】，不动你的机器
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/setup-ollama.yml"
+      - "scripts/setup_ollama.ps1"
+      - "scripts/ci_validate.py"
+      - "config/ollama-models.txt"
+      - "requirements.txt"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------- 云端门禁：不碰本机，公开仓库也安全 ----------
+  validate:
+    name: 仓库结构校验（云端）
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 运行校验
+        run: python scripts/ci_validate.py
+
+  # ---------- 本机安装：需要自托管 runner ----------
+  setup-ollama:
+    name: 安装 Ollama + 拉取模型（本机自托管节点）
+    # 公开仓库安全默认：仅手动触发。详见文件头第 3 条。
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: [self-hosted, windows, X64]
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 环境信息
+        shell: powershell
+        run: |
+          Write-Host "运行节点: $env:RUNNER_NAME ($env:RUNNER_OS)"
+          systeminfo | findstr /B /C:"OS Name" /C:"OS Version"
+
+      - name: 安装 Ollama 并拉取模型
+        shell: powershell
+        env:
+          MODELS: ${{ github.event.inputs.models }}
+          SKIP_PULL: ${{ github.event.inputs.skip_pull }}
+        run: |
+          $args = @()
+          if ($env:MODELS) { $args += @("-Models", $env:MODELS) }
+          if ("$env:SKIP_PULL" -eq "true") { $args += "-SkipPull" }
+          .\scripts\setup_ollama.ps1 @args
+
+      - name: 完成提示
+        shell: powershell
+        if: always()
+        run: |
+          Write-Host "===== 下一步 =====" -ForegroundColor Cyan
+          Write-Host "启动服务   : .\scripts\start.ps1"
+          Write-Host "导入知识库 : python scripts\rag_manager.py add-all"
+          Write-Host "检索测试   : python scripts\rag_manager.py search ""三菱FX5U Modbus 地址"""

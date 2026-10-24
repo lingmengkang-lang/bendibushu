@@ -10,8 +10,9 @@
 #   3) 初始化目录结构
 #   4) 检测 Ollama（可选安装）
 #   5) 运行 selfcheck.ps1 汇总环境状态
-# 本脚本不做什么（遵守"只做工程产出"约定）：
-#   - 不拉取任何模型（模型清单在 config\ollama-models.txt，由你手动 ollama pull）
+# 本脚本不做什么：
+#   - 不拉取任何模型（由 scripts\setup_ollama.ps1 负责，或交给 GitHub/CNB 自托管节点自动执行）
+#   - 不注册自托管 runner / 构建节点（见 docs\deploy\ollama_setup.md）
 #
 # 幂等性：重复执行安全；已存在的 venv 默认跳过创建（除非 -RecreateVenv）。
 
@@ -110,11 +111,12 @@ $sc = $LASTEXITCODE
 Write-Host ""
 Write-Host "===== 部署完成 =====" -ForegroundColor Cyan
 Write-Host "后续步骤（按顺序）：" -ForegroundColor Cyan
-Write-Host "  1) 重开一个终端（刷新 PATH），启动服务:  .\scripts\start.ps1"
-Write-Host "  2) 拉取模型（首次必须）:           ollama pull qwen2.5:7b"
-Write-Host "  3) 放入知识库文档到 data\knowledge_base\docs\，然后导入:"
-Write-Host "     python scripts\rag_manager.py add data\knowledge_base\docs -r"
-Write-Host "  4) WorkBuddy 接入配置:             见 config\workbuddy\knowledge-base.md"
-Write-Host "  5) LoRA 微调（可选）:              见 lora\README.md"
+Write-Host "  1) 安装 Ollama 引擎 + 拉取模型: .\scripts\setup_ollama.ps1"
+Write-Host "     （ winget 装完请重开终端刷新 PATH；也可交给 GitHub/CNB 自托管节点自动装，见 docs\deploy\ollama_setup.md ）"
+Write-Host "  2) 启动服务:                    .\scripts\start.ps1"
+Write-Host "  3) 一键导入知识库:              python scripts\rag_manager.py add-all"
+Write-Host "  4) WorkBuddy 接入配置:          见 config\workbuddy\knowledge-base.md"
+Write-Host "  5) 增加应用场景（新品牌/新器件）: 见 docs\plc\how_to_extend.md"
+Write-Host "  6) LoRA 微调（可选）:           见 lora\README.md"
 if ($sc -ne 0) { Write-Host "`n注意：自检存在 FAIL 项（见上），请先修复。" -ForegroundColor Red; exit 1 }
 exit 0
