@@ -121,6 +121,7 @@ local-offline-assistant/
 │   ├── scada/                      ⭐ 组态软件 TOP5 自动编程能力（组态王/MCGS/WinCC/力控/威纶通）
 │   ├── host/                       上位机程序样例（含 write_safety_template.md 写入安全模板）
 │   ├── devices/                    ⭐ 常用电气件使用方法（你自己持续补充）
+│   └── assistant/ROLE_RULES.md    助手角色铁律（10 条行为规则，已全部写进 webui SYSTEM_PROMPT）
 │   ├── deploy/
 │   │   └── ollama_setup.md         ⭐ 让 GitHub/CNB 自动帮你装 Ollama+模型（自托管节点）
 │   └── review/                     ⭐ 双视角审查报告（资深 IT + 20 年电气自动化）
@@ -277,6 +278,7 @@ A：7B 偏弱、易幻觉；建议至少 **14B**（24G 内存可舒适跑）。�
 **双视角审查报告**（`docs/review/`）：
 - `it_review.md` —— 资深 30 年 IT 工程师视角：安全 / 健壮性 / 幂等 / 可观测 / CI 正确性，含 bug 清单与严重级；
 - `automation_review.md` —— 20 年电气自动化工程师视角：Modbus 0基/1基偏移、各品牌脚本语法准确性、上位机写入校验/轮询/超时、安全红线充分性，给出"必须改/建议改/可不改"结论。
+- `assistant/ROLE_RULES.md` —— 用户对本地离线助手定下的 **10 条行为铁律**（诚实/推理优先/来源标注/领域严谨/上下文管控/拒绝污染/输出自检/模式区分/格式/中文），已全部写进 `app/webui.py` 的 `SYSTEM_PROMPT`，作为 Web 聊天界面的实时约束（见第十一节本机复验的同一份代码）。
 
 ## 十二、许可
 
