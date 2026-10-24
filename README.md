@@ -1,14 +1,14 @@
 # bendibushu（local-offline-assistant）
 
-> **仓库对应**：GitHub（lingmengkang-lang/bendibushu）与 CNB（gongyeyingyong/bendibushu）同名同步；工程目录名为 local-offline-assistant。
+> **仓库对应**：GitHub（lingmengkang-lang/bendibushu）与 CNB（gongyeyingyong/bendibushu）同名；工程目录名为 local-offline-assistant。
 
-**Windows 本地离线 AI 助手一体化部署工程：Ollama 本地推理 + Chroma 本地 RAG 知识库 + LLaMA-Factory LoRA 微调训练 + WorkBuddy 接入配置，数据不出域，支持运维/办公/工控等多场景离线使用。**
+**Windows 本地离线 AI 助手一体化部署工程，聚焦 PLC / 工控自动化行业应用：Ollama 本地推理 + Chroma 本地 RAG 知识库 + LLaMA-Factory LoRA 微调 + WorkBuddy 接入配置。数据不出域，面向多品牌 PLC（西门子 / 台达 / 三菱 / 信捷 / 欧姆龙 / 汇川）及伺服电机、驱动器、变频电源等自动化配件，提供编程辅助、手册问答、故障排查等离线能力。**
 
 ---
 
 ## 一、方案定位
 
-面向 **Windows 本机**的离线 AI 助手工程，四层能力开箱即用：
+面向 **Windows 本机**的离线 AI 助手工程，四层能力开箱即用；当前重心为 **PLC / 工控自动化**：
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -23,9 +23,16 @@
            全部组件本地运行，业务数据不出本机
 ```
 
+**适用场景（工控向）**：
+- PLC 编程辅助：IEC 61131-3 ST/LAD 思路、逻辑起草、代码审查、报错分析；
+- 多品牌手册问答：西门子 / 台达 / 三菱 / 信捷 / 欧姆龙 / 汇川的指令集、参数、接线；
+- 伺服电机、驱动器、变频电源（VFD）的选型 / 参数 / 通信（Modbus / EtherCAT / 脉冲）配置咨询；
+- 故障排查、联锁与急停逻辑、PID 整定等经验性问题的离线检索。
+
 **边界声明（重要）**：
 - 本工程是**部署与配置工程**，不含模型文件、不自动拉取模型（Ollama 模型需你手动 `ollama pull`）；
 - 知识库、日志、向量库等运行时数据均被 `.gitignore` 排除，仓库只含代码与配置；
+- AI 生成的 PLC / 工控代码**仅供起草与教学**，必须经由合格工程师审核并在仿真中验证（见 `docs/plc/SAFETY.md`）；
 - LoRA 微调使用 HuggingFace/ModelScope 格式模型，与 Ollama 的 gguf 格式**不通用**（详见 `lora/README.md`）。
 
 ## 二、目录结构
@@ -35,9 +42,10 @@ local-offline-assistant/
 ├── README.md                       本文件
 ├── requirements.txt                核心依赖（chromadb 等）
 ├── .gitignore                      运行时数据排除规则
+├── LICENSE                         MIT 许可证
 ├── config/
 │   ├── rag.config.json             RAG 参数（向量库/嵌入/分块/支持格式）
-│   ├── ollama-models.txt           推荐模型清单（仅清单，不自动拉取）
+│   ├── ollama-models.txt           推荐模型清单（含 24G+CPU 卸载指引，不自动拉取）
 │   └── workbuddy/
 │       ├── mcp.fragment.json       WorkBuddy MCP 接入配置片段
 │       └── knowledge-base.md       接入说明 + 知识库结构
@@ -55,7 +63,13 @@ local-offline-assistant/
 │   ├── configs/qlora_sft.yaml      QLoRA 配置模板
 │   └── dataset/                    数据集注册 + alpaca 示例数据
 ├── docs/
-│   └── sample_test_doc.md          RAG 导入测试示例文档
+│   ├── sample_test_doc.md          RAG 导入测试示例文档
+│   └── plc/                        PLC/工控应用资料（本工程重心）
+│       ├── SAFETY.md               安全红线（必读）
+│       ├── st_template.st          IEC 61131-3 ST 示例集（厂商中立）
+│       ├── rag_guide.md            把厂家手册/程序喂进 RAG 的指引
+│       ├── brands.md               多品牌对照速查
+│       └── sample_plc_doc.md       知识库示例样板
 └── data/ logs/ models/ lora/output/   运行时目录（部署时自动创建，不入库）
 ```
 
@@ -74,12 +88,12 @@ cd local-offline-assistant
 # 2. 启动服务（新开终端，刷新 PATH）
 .\scripts\start.ps1
 
-# 3. 拉取模型（首次必须；清单与显存参考见 config\ollama-models.txt）
-ollama pull qwen2.5:7b
+# 3. 拉取模型（首次必须；PLC 专业场景建议 14B，见 config\ollama-models.txt）
+ollama pull qwen2.5:14b
 
-# 4. 导入知识库并验证（把文档放进 data\knowledge_base\docs\）
+# 4. 导入知识库并验证（把你们的厂家手册/程序脱敏后放进 data\knowledge_base\docs\）
 python scripts\rag_manager.py add data\knowledge_base\docs -r
-python scripts\rag_manager.py search "测试问题" --top-k 5
+python scripts\rag_manager.py search "西门子 S7-1200 高速计数器怎么配" --top-k 5
 
 # 5. 接入 WorkBuddy（可选）
 #    按 config\workbuddy\knowledge-base.md 合并 mcp.fragment.json 到 ~/.workbuddy/mcp.json
@@ -92,7 +106,7 @@ python scripts\rag_manager.py search "测试问题" --top-k 5
 | 配置 | 位置 | 要点 |
 |---|---|---|
 | RAG | `config/rag.config.json` | 集合名、嵌入方式（chroma-default / ollama）、分块大小与重叠、支持的文件格式 |
-| 模型清单 | `config/ollama-models.txt` | 推理/嵌入模型推荐 + 显存参考【⚠️显存数值为经验值】 |
+| 模型清单 | `config/ollama-models.txt` | 推理/嵌入模型推荐 + **24G 内存 + CPU 卸载**指引【⚠️显存数值为经验值】 |
 | WorkBuddy | `config/workbuddy/mcp.fragment.json` | **仅结构示例**，真实 command/args 需按你选用的 MCP 服务器填写【⚠️需核实】，见同目录 knowledge-base.md |
 | LoRA | `lora/configs/qlora_sft.yaml` | 字段随 LLaMA-Factory 版本演进，以官方文档为准 |
 
@@ -105,6 +119,7 @@ python scripts\rag_manager.py search "测试问题" --top-k 5
 | `stop.ps1` 停止进程 | 误杀风险 | 只停 PID 文件记录且进程名校验通过的进程；无 PID 文件不自动杀 |
 | `install.ps1 -RecreateVenv` | 删除重建 venv | 需显式传参 |
 | `install.ps1 -InstallOllama` | 联网安装 + 可能弹 UAC | 需显式传参，默认仅检测引导 |
+| **PLC / 工控代码** | **错误程序可能导致设备损坏/伤人** | **AI 输出仅作起草，必须工程师审核 + 仿真验证（见 `docs/plc/SAFETY.md`）** |
 
 **生产/重要机器上执行任何删除类操作前，请先备份 `data/` 与 `logs/` 目录。**
 
@@ -114,7 +129,7 @@ python scripts\rag_manager.py search "测试问题" --top-k 5
 A：Ollama 用 gguf 格式，LLaMA-Factory 训练用 HuggingFace/ModelScope 格式。训练产物需合并 LoRA 后按双方官方文档转换才能在 Ollama 使用【⚠️转换命令随版本变化，以官方文档为准】。
 
 **Q：完全离线的机器能用吗？**
-A：可以，但有一次“联网预热”：Chroma 默认嵌入方式首次运行会自动下载 ONNX 模型权重。完全无网的机器请预先在联网机器下载放置，或切换 `provider=ollama` 用本地 Ollama 嵌入模型（见 `config/workbuddy/knowledge-base.md`）。
+A：可以，但有一次"联网预热"：Chroma 默认嵌入方式首次运行会自动下载 ONNX 模型权重。完全无网的机器请预先在联网机器下载放置，或切换 `provider=ollama` 用本地 Ollama 嵌入模型（见 `config/workbuddy/knowledge-base.md`）。
 
 **Q：没有 NVIDIA 显卡？**
 A：Ollama 可 CPU 推理 7B（慢但可用）；LoRA 训练 7B 在 CPU 上基本不可行，仅建议用于跑通流程。
@@ -122,7 +137,19 @@ A：Ollama 可 CPU 推理 7B（慢但可用）；LoRA 训练 7B 在 CPU 上基�
 **Q：Windows 上训练稳吗？**
 A：LLaMA-Factory 单卡流程在 Windows 原生环境可跑通；多卡/量化内核/DeepSpeed 场景建议 Linux 或 WSL2【⚠️社区经验】。
 
-## 七、信息来源与存疑标注汇总
+**Q：PLC 编程/伺服/变频这类专业问题，小模型够用吗？**
+A：7B 偏弱、易幻觉；建议至少 **14B**（24G 内存可舒适跑）。但更关键的是把你们的手册/程序喂进 RAG（见 `docs/plc/rag_guide.md`）——领域准确性靠"模型 + 你的资料"双管齐下。
+
+## 七、PLC / 工控应用专章（本工程重心）
+
+详见 `docs/plc/` 目录：
+- **SAFETY.md** — 安全红线，**部署前必读**；
+- **st_template.st** — IEC 61131-3 ST 示例集（电机启停/急停联锁、定时器、计数器、PID、伺服定位），厂商中立；
+- **rag_guide.md** — 把西门子/台达/三菱/信捷/欧姆龙/汇川手册与程序（脱敏）导入知识库的指引；
+- **brands.md** — 多品牌软件/语言对照速查 + 伺服/变频领域要点；
+- **sample_plc_doc.md** — 知识库资料整理样板。
+
+## 八、信息来源与存疑标注汇总
 
 本仓库内容按三类来源组织：
 
@@ -133,6 +160,6 @@ A：LLaMA-Factory 单卡流程在 Windows 原生环境可跑通；多卡/量化�
   3. LLaMA-Factory 配置字段与训练产物转 Ollama 的具体命令（以双方官方文档为准）；
   4. PyTorch/CUDA 组合命令（以 pytorch.org 当前页面为准）。
 
-## 八、许可
+## 九、许可
 
-仓库当前**未附加 LICENSE 文件**。公开仓库建议补充许可证（默认建议 MIT），需要添加请告知。
+仓库采用 **MIT 许可证**（`LICENSE` 文件）。公开仓库，可自由使用、修改、分发，但按 MIT 条款须保留版权与许可声明；不提供任何担保。
