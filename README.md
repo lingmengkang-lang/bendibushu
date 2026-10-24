@@ -2,7 +2,7 @@
 
 > **仓库对应**：GitHub（lingmengkang-lang/bendibushu）与 CNB（gongyeyingyong/bendibushu）同名；工程目录名为 local-offline-assistant。
 
-**Windows 本机离线 AI 助手，专做工控软件应用：PLC 编写、变频器（VFD）调试、伺服电机调试、触摸屏（HMI）使用、编码器使用，以及"自动控制软件写程序"。离线推理（Ollama）+ 本地知识库（Chroma RAG）+ WorkBuddy 接入配置，数据不出域，覆盖西门子 / 台达 / 三菱 / 信捷 / 欧姆龙 / 汇川等多品牌及伺服、驱动器、变频电源等自动化配件。**
+**Windows 本机离线 AI 助手，专做工控软件应用：PLC 编写、变频器（VFD）调试、伺服电机调试、触摸屏（HMI）/ 组态软件（组态王、MCGS、台达 DIAEntegro、WinCC 等）、编码器使用、上位机程序编写，以及"自动控制软件写程序"。离线推理（Ollama）+ 本地知识库（Chroma RAG）+ WorkBuddy 接入配置，数据不出域，覆盖西门子 / 台达 / 三菱 / 信捷 / 欧姆龙 / 汇川等多品牌及伺服、驱动器、变频电源等自动化配件。**
 
 ---
 
@@ -10,7 +10,7 @@
 
 **能，但定位是"AI 辅助起草"，不是全自动代写。** 这一点必须先说清楚：
 
-- 助手可为 **TIA Portal（SCL）、GX Works（ST）、InoProShop（ST/CODESYS）、ISPSoft、Sysmac Studio、CX-Programmer、各品牌 HMI 组态软件、伺服/变频调试软件** 等**生成文本形式的程序、配置、参数表、接线与调试清单**；
+- 助手可为 **TIA Portal（SCL）、GX Works（ST）、InoProShop（ST/CODESYS）、ISPSoft、Sysmac Studio、CX-Programmer、各品牌 HMI / 组态软件（组态王、MCGS、台达 DIAEntegro、WinCC 等）、伺服/变频调试软件，以及上位机程序（C# / Python / LabVIEW 等）** 生成文本形式的程序、配置、参数表、变量点表、脚本与调试清单；
 - 你把这些文本复制 / 导入对应的工控软件里编译、下装即可；
 - 它**不能直接点击操作厂商软件的图形界面**（本工程不含 RPA / 无 GUI 自动化），但产出的就是软件能直接吃进去的源码 / 配置文件；
 - 所有产出**仅供起草与教学**，必须经合格工程师审核 + 仿真验证（见 `docs/plc/SAFETY.md`）后才能下装到真实设备。
@@ -19,7 +19,7 @@
 
 ---
 
-## 一、覆盖的工控软件应用（6 大类）
+## 一、覆盖的工控软件应用（8 大类）
 
 | # | 应用 | 典型软件 / 语言 | 助手能帮你做的事 |
 |---|---|---|---|
@@ -29,6 +29,8 @@
 | 4 | **触摸屏（HMI）使用** | WinCC / GT Designer / NB / EBPro / MCGS 等 | 画面组态思路、变量映射表、通信参数、报警/趋势配置草稿 |
 | 5 | **编码器使用** | PLC 高速计数器 / 运动轴配置 | 增量/绝对式选型、A/B/Z 接线、SSI/EnDat/BiSS 读取逻辑、与 HSC 配合 |
 | 6 | **自动控制软件写程序** | 上述各类软件的源码/配置文件 | 面向"自动控制"场景的程序/配置/参数集起草（见上方说明） |
+| 7 | **组态软件（SCADA/HMI）** | 组态王、MCGS（昆仑通态）、台达 DIAEntegro、WinCC、力控、EBPro | 变量点表、设备通信参数、命令语言/脚本、画面组态草稿 |
+| 8 | **上位机程序编写** | C#/.NET、Python、LabVIEW（Modbus / OPC UA / S7 / MC 等） | 读写寄存器代码、采集/日志、报警、曲线、异常/超时处理 |
 
 ---
 
@@ -53,7 +55,7 @@
 - PLC 编程辅助：IEC 61131-3 ST/LAD 思路、逻辑起草、代码审查、报错分析；
 - 多品牌手册问答：西门子 / 台达 / 三菱 / 信捷 / 欧姆龙 / 汇川的指令集、参数、接线；
 - 伺服电机、驱动器、变频电源（VFD）的选型 / 参数 / 通信（Modbus / EtherCAT / 脉冲）配置咨询；
-- 触摸屏（HMI）组态、编码器接入、自动控制程序草稿；
+- 触摸屏（HMI）/ 组态软件（组态王、MCGS、台达 DIAEntegro、WinCC 等）组态、编码器接入、上位机程序、自动控制程序草稿；
 - 故障排查、联锁与急停逻辑、PID 整定等经验性问题的离线检索。
 
 **边界声明（重要）**：
@@ -95,7 +97,8 @@ local-offline-assistant/
 │       ├── st_template.st          IEC 61131-3 ST 示例集（厂商中立）
 │       ├── rag_guide.md            把厂家手册/程序喂进 RAG 的指引
 │       ├── brands.md               多品牌对照 + HMI/编码器速查
-│       ├── commissioning.md        变频器/伺服/触摸屏/编码器调试检查清单
+│       ├── commissioning.md        变频器/伺服/触摸屏/编码器/组态软件/上位机调试检查清单
+│       ├── hmi_scada_host.md       组态软件(组态王/MCGS/台达/WinCC)与上位机程序编写指引
 │       └── sample_plc_doc.md       知识库示例样板（也可作 RAG 导入测试）
 └── data/ logs/ models/ lora/output/   运行时目录（部署时自动创建，不入库）
 ```
@@ -146,14 +149,14 @@ python scripts\rag_manager.py search "西门子 S7-1200 高速计数器怎么配
 | `stop.ps1` 停止进程 | 误杀风险 | 只停 PID 文件记录且进程名校验通过的进程；无 PID 文件不自动杀 |
 | `install.ps1 -RecreateVenv` | 删除重建 venv | 需显式传参 |
 | `install.ps1 -InstallOllama` | 联网安装 + 可能弹 UAC | 需显式传参，默认仅检测引导 |
-| **PLC / 工控代码 / HMI / 编码器配置** | **错误程序可能导致设备损坏/伤人** | **AI 输出仅作起草，必须工程师审核 + 仿真验证（见 `docs/plc/SAFETY.md`）** |
+| **PLC / 工控代码 / HMI / 组态软件 / 上位机 / 编码器配置** | **错误程序可能导致设备损坏/伤人** | **AI 输出仅作起草，必须工程师审核 + 仿真验证（见 `docs/plc/SAFETY.md`）** |
 
 **生产/重要机器上执行任何删除类操作前，请先备份 `data/` 与 `logs/` 目录。**
 
 ## 七、FAQ
 
 **Q：你标题说"自动控制软件写程序"，到底能不能办到？**
-A：**能办到"起草"，不能办到"全自动代写"。** 本助手可为各品牌 PLC 编程软件、HMI 组态软件、伺服/变频调试软件生成文本程序、配置与参数表，你导入软件即可编译下装；它不能代替你在软件里点鼠标（不含 GUI 自动化）。是否"自动"取决于你把它接进工作流的程度——例如通过 MCP 把本地 Ollama 接进 WorkBuddy，你口述需求它就出代码。但代码下装前必须人工审核 + 仿真。
+A：**能办到"起草"，不能办到"全自动代写"。** 本助手可为各品牌 PLC 编程软件、HMI/组态软件（组态王、MCGS、台达 DIAEntegro、WinCC 等）、伺服/变频调试软件、上位机程序（C#/Python）生成文本程序、配置与参数表，你导入软件即可编译下装；它不能代替你在软件里点鼠标（不含 GUI 自动化）。是否"自动"取决于你把它接进工作流的程度——例如通过 MCP 把本地 Ollama 接进 WorkBuddy，你口述需求它就出代码。但代码下装前必须人工审核 + 仿真。
 
 **Q：Ollama 模型和 LoRA 训练的模型为什么不能通用？**
 A：Ollama 用 gguf 格式，LLaMA-Factory 训练用 HuggingFace/ModelScope 格式。训练产物需合并 LoRA 后按双方官方文档转换才能在 Ollama 使用【⚠️转换命令随版本变化，以官方文档为准】。
@@ -167,7 +170,7 @@ A：Ollama 可 CPU 推理 7B（慢但可用）；LoRA 训练 7B 在 CPU 上基�
 **Q：Windows 上训练稳吗？**
 A：LLaMA-Factory 单卡流程在 Windows 原生环境可跑通；多卡/量化内核/DeepSpeed 场景建议 Linux 或 WSL2【⚠️社区经验】。
 
-**Q：PLC 编程/伺服/变频/触摸屏/HMI 这类专业问题，小模型够用吗？**
+**Q：PLC 编程/伺服/变频/触摸屏/HMI/组态软件/上位机 这类专业问题，小模型够用吗？**
 A：7B 偏弱、易幻觉；建议至少 **14B**（24G 内存可舒适跑）。但更关键的是把你们的手册/程序喂进 RAG（见 `docs/plc/rag_guide.md`）——领域准确性靠"模型 + 你的资料"双管齐下。
 
 ## 八、工控应用专章（本工程全部重心）
@@ -177,7 +180,8 @@ A：7B 偏弱、易幻觉；建议至少 **14B**（24G 内存可舒适跑）。�
 - **st_template.st** — IEC 61131-3 ST 示例集（电机启停/急停联锁、定时器、计数器、PID、伺服定位），厂商中立；
 - **rag_guide.md** — 把西门子/台达/三菱/信捷/欧姆龙/汇川手册、HMI 软件手册、伺服/编码器资料与程序（脱敏）导入知识库的指引；
 - **brands.md** — 多品牌软件/语言对照速查 + HMI/触摸屏、编码器要点；
-- **commissioning.md** — 变频器/伺服/触摸屏(HMI)/编码器 四类调试检查清单；
+- **commissioning.md** — 变频器/伺服/触摸屏(HMI)/编码器/组态软件/上位机 六类调试检查清单；
+- **hmi_scada_host.md** — 组态软件（组态王/MCGS/台达 DIAEntegro/WinCC/力控等）与上位机程序编写（C#/Python/LabVIEW）指引、协议与示例代码；
 - **sample_plc_doc.md** — 知识库资料整理样板（也可作 RAG 导入测试样例）。
 
 ## 九、信息来源与存疑标注汇总

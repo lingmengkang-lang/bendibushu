@@ -8,6 +8,8 @@ RAG（检索增强）让模型在回答时引用你提供的手册、样本与�
 
 - **PLC 编程手册 / 指令集**：西门子、台达、三菱、信捷、欧姆龙、汇川等；
 - **HMI / 触摸屏软件手册**：WinCC、GT Designer、NB/CX-Designer、DOPSoft、InoProShop HMI、MCGS、EBPro 等（变量地址表、通信驱动、画面组态说明极有价值）；
+- **组态软件手册 / 样例工程**：组态王（KingView）命令语言与变量点表、MCGS（昆仑通态）脚本与设备窗口、台达 DIAEntegro、WinCC、力控 等（变量点表、设备通信参数、命令语言/脚本样例极具参考价值）；
+- **上位机程序样例**：C#（NModbus / S7.Net / OPC UA）、Python（pymodbus / python-snap7 / python-opcua）、LabVIEW 等读写下位机的源码与寄存器分配表（务必脱敏）；
 - **伺服 / 驱动器手册**：IS620P、MR-Config、各品牌调试软件说明、参数表、三环整定笔记；
 - **变频器 / 变频电源（VFD）手册**：参数说明、加减速/多段速/Modbus 寄存器表；
 - **编码器资料**：选型样本、接线图、SSI/EnDat/BiSS 协议说明；
@@ -16,7 +18,7 @@ RAG（检索增强）让模型在回答时引用你提供的手册、样本与�
 - **通信协议说明**：Modbus RTU/TCP 寄存器表、EtherCAT/脉冲接线、参数地址映射；
 - **故障代码表 / 排查经验**：把常见报警与处理写成文档，检索效果极佳。
 
-> 多品牌混用时，建议按品牌 + 设备类型建子目录（如 `docs/siemens/`、`docs/mitsubishi/`、`docs/hmi/`、`docs/encoder/`），
+> 多品牌混用时，建议按品牌 + 设备类型建子目录（如 `docs/siemens/`、`docs/mitsubishi/`、`docs/hmi/`、`docs/scada/`、`docs/host/`、`docs/encoder/`），
 > 或在文件名/正文里写明品牌与型号，便于模型区分指令差异。
 
 ## 二、支持的格式
