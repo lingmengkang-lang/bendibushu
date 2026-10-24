@@ -79,7 +79,7 @@ local-offline-assistant/
 ├── LICENSE                         MIT 许可证
 ├── config/
 │   ├── rag.config.json             RAG 参数（向量库/嵌入/分块/支持格式/知识目录）
-│   ├── ollama-models.txt           推荐模型清单（含 24G+CPU 卸载指引）
+│   ├── ollama-models.txt           推荐模型清单（含 16G 实测硬件指引 + 内存升级路径）
 │   ├── ollama-vision-model.txt     视觉模型清单（图片解析用，默认 qwen2.5vl:7b）
 │   └── workbuddy/
 │       ├── mcp.fragment.json       WorkBuddy MCP 接入配置片段
@@ -152,7 +152,11 @@ cd local-offline-assistant
 
 # 2. 安装 Ollama 引擎 + 拉取模型（幂等，可反复跑；也可交给 CI 做，见下一步）
 .\scripts\setup_ollama.ps1
-#   只拉指定模型：.\scripts\setup_ollama.ps1 -Models "qwen2.5:14b,nomic-embed-text"
+#   只拉指定模型：.\scripts\setup_ollama.ps1 -Models "qwen2.5:14b-instruct-q6_K,bge-m3"
+#   额外拉视觉模型（图片解析）：.\scripts\setup_ollama.ps1 -PullVision
+#   ⚠️ 模型默认下载到 C:\Users\<你>\.ollama\models；本机 C: 余量约 70GB、D: 约 299GB，
+#      建议先把模型目录挪到 D 盘（重开终端后生效）：
+#      setx OLLAMA_MODELS "D:\ollama-models"
 
 # 3. 启动服务
 .\scripts\start.ps1
@@ -179,8 +183,8 @@ python scripts\rag_manager.py search "西门子 S7-1200 高速计数器怎么配
 
 | 配置 | 位置 | 要点 |
 |---|---|---|
-| RAG | `config/rag.config.json` | 集合名、嵌入方式（chroma-default / ollama）、分块大小与重叠、支持的文件格式 |
-| 模型清单 | `config/ollama-models.txt` | 推理/嵌入模型推荐 + **24G 内存 + CPU 卸载**指引【⚠️显存数值为经验值】 |
+| RAG | `config/rag.config.json` | 集合名、嵌入方式（默认 `ollama` + `bge-m3`，中文强；备选 `chroma-default`）、分块大小与重叠、支持的文件格式 |
+| 模型清单 | `config/ollama-models.txt` | 推理/嵌入模型推荐 + **16G 实测硬件 + 内存升级路径**指引【⚠️体积/速度为经验值】 |
 | 视觉模型清单 | `config/ollama-vision-model.txt` | 图片解析用视觉模型，默认 `qwen2.5vl:7b`（备选 llava:7b / minicpm-v） |
 | WorkBuddy | `config/workbuddy/mcp.fragment.json` | **仅结构示例**，真实 command/args 需按你选用的 MCP 服务器填写【⚠️需核实】，见同目录 knowledge-base.md |
 | LoRA | `lora/configs/qlora_sft.yaml` | 字段随 LLaMA-Factory 版本演进，以官方文档为准（可选组件） |
@@ -226,10 +230,17 @@ A：Ollama 可 CPU 推理 7B（慢但可用）；LoRA 训练 7B 在 CPU 上基�
 A：LLaMA-Factory 单卡流程在 Windows 原生环境可跑通；多卡/量化内核/DeepSpeed 场景建议 Linux 或 WSL2【⚠️社区经验】。
 
 **Q：PLC 编程/伺服/变频/触摸屏/HMI/组态软件/上位机 这类专业问题，小模型够用吗？**
-A：7B 偏弱、易幻觉；建议至少 **14B**（24G 内存可舒适跑）。但更关键的是把你们的手册/程序喂进 RAG（见 `docs/plc/rag_guide.md`）——领域准确性靠"模型 + 你的资料"双管齐下。
+A：7B 偏弱、易幻觉；本机 16GB 内存下默认已上 **`qwen2.5:14b-instruct-q6_K`**（比 Q4 量化精度更高，速度换准确度）。但更关键的是把你们的手册/程序喂进 RAG（默认嵌入 `bge-m3`，中文检索明显更准，见 `docs/plc/rag_guide.md`）——领域准确性靠"模型 + 你的资料"双管齐下。
+
+**Q：想让模型更大更准（32B/70B）？为什么现在不直接上？**
+A：**卡在内存，不卡在配置。** 本机实测 16GB 内存（2×8GB）+ RTX 4050 6GB 显存，14B Q6 已是当前硬件上限；32B（约 20GB）物理上放不进 16GB 内存，强开会磁盘交换风暴，那不是"慢"是不可用。升级路径（Lenovo Legion 5 16IRX9/83DG，双 SO-DIMM，官方最大 64GB DDR5-5600，**必须成对安装**）：
+- **16→32GB**：购 2×16GB DDR5-5600 SO-DIMM → 换内存 → 把 `config/ollama-models.txt` 里 `qwen2.5:32b-instruct-q4_K_M` 取消注释（视觉同理上 `qwen2.5vl:32b-q4_K_M`）；
+- **32→64GB**：购 2×32GB → 可上 72B 档（CPU 卸载，慢但质量顶格）。
+
+⚠️ 拆机有风险（保修/卡扣/静电），升级前备份重要数据，不熟悉送服务站。详细步骤见 `config/ollama-models.txt` 顶部"内存升级路径"。
 
 **Q：能解析图片吗（电气/PLC 图纸、铭牌参数、HMI/报警画面、OCR）？**
-A：**能。** Web 界面点输入框左侧 📎 或把图片拖进输入框，自动走视觉模型（默认 `qwen2.5vl:7b`，首次需联网 `ollama pull qwen2.5vl:7b`），无图时走文本模型。覆盖四类场景：图纸/程序截图、变频器/伺服/编码器铭牌与参数面板、HMI/组态画面与报警截图、通用 OCR；解析会叠加工控 RAG 与专用准确度规则（看不清的直说、推测标注需核对）。用法与排障见 `docs/plc/image_parsing.md`。
+A：**能。** Web 界面点输入框左侧 📎 或把图片拖进输入框，自动走视觉模型（默认 `qwen2.5vl:7b-q4_K_M`，首次需联网 `ollama pull qwen2.5vl:7b-q4_K_M`），无图时走文本模型。覆盖四类场景：图纸/程序截图、变频器/伺服/编码器铭牌与参数面板、HMI/组态画面与报警截图、通用 OCR；解析会叠加工控 RAG 与专用准确度规则（看不清的直说、推测标注需核对）。用法与排障见 `docs/plc/image_parsing.md`。
 
 ## 八、工控应用专章（本工程全部重心）
 
@@ -310,7 +321,7 @@ A：**能。** Web 界面点输入框左侧 📎 或把图片拖进输入框，�
 **方式 A（推荐，最小）：下载发布 zip**
 1. 维护者运行 `.\deploy\package.ps1` → 生成 `releases/local-offline-assistant-YYYYMMDD.zip`（仅含源码，几 MB，已排除 venv/模型/数据/日志）。
 2. 把 zip 发给使用者；使用者解压到任意目录（如 `D:\assistant`）。
-3. **双击 `启动.bat`** → 自动：检测/装 Python → 建 venv 装依赖 → 检测/装 Ollama → 拉默认模型（含视觉模型 `qwen2.5vl:7b`，失败不阻塞） → 导入知识库 → 启动服务 → **打开浏览器 http://127.0.0.1:8500**。
+3. **双击 `启动.bat`** → 自动：检测/装 Python → 建 venv 装依赖 → 检测/装 Ollama → 拉默认模型（含视觉模型 `qwen2.5vl:7b-q4_K_M`，失败不阻塞） → 导入知识库 → 启动服务 → **打开浏览器 http://127.0.0.1:8500**。
 4. 在网页里用中文提问即可；勾选"启用知识库"会用你导入的工控文档作答。
 5. 停止：**双击 `停止.bat`**。
 

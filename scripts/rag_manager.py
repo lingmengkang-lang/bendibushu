@@ -69,10 +69,16 @@ def get_embedding_fn(cfg: dict):
             from chromadb.utils.embedding_functions import OllamaEmbeddingFunction
             return OllamaEmbeddingFunction(
                 url="http://127.0.0.1:11434/api/embeddings",
-                model_name=cfg["embedding"].get("ollama_model", "nomic-embed-text"),
+                model_name=cfg["embedding"].get("ollama_model", "bge-m3"),
             )
         except Exception as e:
-            print(f"[WARN] Ollama 嵌入函数加载失败（{e}），回退到 Chroma 默认嵌入")
+            print(f"[WARN] Ollama 嵌入函数加载失败（{e}）")
+            print("[WARN] provider=ollama 需要 Python 包 'ollama'：deploy/install.ps1 会自动安装，"
+                  "或手动执行 pip install ollama。")
+            print("[WARN] 当前回退到 Chroma 默认嵌入（英文向 ONNX，中文检索较弱，且向量维度不同，"
+                  "已有 bge-m3 向量库需 clear 后重建）。")
+            print("[WARN] 若不想安装：把 config/rag.config.json 的 embedding.provider 改回 "
+                  "chroma-default。")
             return None
     print(f"[WARN] 未知 embedding provider: {provider}，回退到 Chroma 默认嵌入")
     return None

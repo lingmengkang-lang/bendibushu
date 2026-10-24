@@ -76,4 +76,8 @@ python scripts\rag_manager.py stats
 
 ### ⚠️ 首次运行注意
 
-`provider=chroma-default` 时，Chroma 首次运行会自动下载一次内置 ONNX 嵌入模型权重（约 80MB 级），**需要联网**；下载完成后永久离线可用。如运行环境完全无网，请预先在联网机器上下载并放置到用户缓存目录，或切换到 `provider=ollama` 使用本地 Ollama 嵌入模型。
+本工程默认 `provider=ollama` + `bge-m3`（约 1.2GB，需先 `ollama pull bge-m3`，导入/检索时 Ollama 需在运行），**首次需联网拉取一次**，之后完全离线。
+
+若切到 `provider=chroma-default`：Chroma 首次运行会自动下载一次内置 ONNX 嵌入模型权重（约 80MB 级），**需要联网**；下载完成后永久离线可用。如运行环境完全无网，请预先在联网机器上下载并放置到用户缓存目录。
+
+⚠️ 两种 provider 的向量维度不同（bge-m3=1024 维，MiniLM=384 维），切换后必须 `rag_manager.py clear` 再重新 `add-all`（见 `docs/plc/rag_guide.md` 第 4.1 节）。

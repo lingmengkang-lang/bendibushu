@@ -49,10 +49,24 @@ python scripts\rag_manager.py stats
 ## 四、配置要点（见 config/rag.config.json）
 - `chunk_size` / `chunk_overlap`：手册类长文档建议 500/50，避免截断语义；
 - `knowledge_dirs`：`add-all` / `scan` 按此列表走；**新建目录后加到这里**；
-- `provider`：默认 `chroma-default`（首次需联网下载 ONNX 嵌入权重，约 80MB）；
-  完全离线机器请切 `ollama` 用本地嵌入模型（见 `config/workbuddy/knowledge-base.md`）。
+- `provider`：默认 `ollama` + `bge-m3`（中文/多语言嵌入，约 1.2GB，中文检索明显优于
+  Chroma 内置的英文向 ONNX 嵌入；需先 `ollama pull bge-m3`，`setup_ollama.ps1` 会自动拉）；
+  备选 `chroma-default`（首次需联网下载 ONNX 嵌入权重，约 80MB，见 `config/workbuddy/knowledge-base.md`）。
 
-### 4.1 ⚠️ 首次运行要联网下载嵌入模型（实测踩坑）
+### 4.1 ⚠️ 切换嵌入方式/模型 = 向量库必须重建（维度不兼容）
+
+`chroma-default`（`all-MiniLM-L6-v2`，384 维）与 `bge-m3`（1024 维）产出的向量**维度不同**，
+同一集合里混用会在检索时报维度错误。凡改动 `embedding.provider` 或 `embedding.ollama_model`：
+
+```powershell
+python scripts\rag_manager.py clear     # ⚠️ 永久删除整个集合，需交互输入 yes
+python scripts\rag_manager.py add-all   # 用新嵌入模型重建
+```
+
+> 备份提示：`data/chroma` 为运行时数据（已被 `.gitignore` 排除），重建前如有重要导入结果，
+> 先复制 `data\chroma` 目录留底。
+
+### 4.2 首次运行要联网下载嵌入模型（chroma-default 路线的实测踩坑）
 
 `chroma-default` 用的是 `all-MiniLM-L6-v2`，**第一次执行 add/search 会自动下载约 80MB 的
 ONNX 权重**到 `%USERPROFILE%\.cache\chroma\onnx_models\`，之后才真正离线。
@@ -60,15 +74,12 @@ ONNX 权重**到 `%USERPROFILE%\.cache\chroma\onnx_models\`，之后才真正离
 如果本机下载不了（表现为卡在 `onnx.tar.gz` 反复重试、最后报
 `The read operation timed out in upsert`），三种解法：
 
-1. **换本地嵌入模型（推荐，顺便把 Ollama 用起来）**：把 `config/rag.config.json` 的
-   `embedding.provider` 改成 `ollama`，并先 `ollama pull nomic-embed-text`（`setup_ollama.ps1` 会自动拉）。
+1. **换本地嵌入模型（推荐，本工程默认已是此路线）**：确认 `config/rag.config.json` 的
+   `embedding.provider` 为 `ollama`，并先 `ollama pull bge-m3`（`setup_ollama.ps1` 会自动拉）。
 2. **预置缓存**：在能联网的机器上下载好权重，把整个
    `%USERPROFILE%\.cache\chroma\onnx_models\all-MiniLM-L6-v2` 目录拷到本机同路径。
 3. **清掉半截文件再重试**：下载中断会留下不完整的 `onnx.tar.gz`，删掉它再在好网络下重跑
    （残留文件会被误判为"已缓存"而报损坏）。
-
-> 换 `provider: ollama` 后，向量库里的已有向量与新嵌入模型**不兼容**，需要
-> `rag_manager.py clear` 后重新 `add-all`。
 
 ## 五、注意事项
 - **不要**把涉密/隐私信息提交进 Git 仓库（这些文件已被 `.gitignore` 排除，不会入库）；

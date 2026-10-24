@@ -210,7 +210,7 @@ if ($SkipPull) {
 # ---------- 5b. 视觉/图片解析模型（-PullVision 时；best-effort，失败不致命）----------
 if ($PullVision -and -not $SkipPull) {
     $visionFile = Join-Path $root "config\ollama-vision-model.txt"
-    $visionModel = "qwen2.5vl:7b"
+    $visionModel = "qwen2.5vl:7b-q4_K_M"
     if (Test-Path $visionFile) {
         foreach ($line in Get-Content $visionFile) {
             $t = $line.Trim()

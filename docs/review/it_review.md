@@ -45,7 +45,7 @@
 
 ### 1.5 🟠 严重（运营坑）— 嵌入模型首次联网下载超时残留（已缓解）
 - **现象**：`chroma-default` 使用的 `all-MiniLM-L6-v2` 首次运行需联网下载约 80MB 到 `%USERPROFILE%\.cache\chroma\onnx_models\`。沙箱网络弱时下了 3.9MB 就超时（`The read operation timed out in upsert`），并在缓存目录留下**残片**。残片会让 Chroma 误判"已缓存"而跳过重下，进而后续全部嵌入失败。
-- **缓解**：已删除残片，并在 `docs/plc/rag_guide.md` 第 4.1 节写入绕法：`provider` 切到 `ollama`（用本地 `nomic-embed-text`，完全离线）或预先把缓存目录拷贝到位。
+- **缓解**：已删除残片，并在 `docs/plc/rag_guide.md` 第 4.2 节写入绕法：`provider` 切到 `ollama`（用本地嵌入模型，完全离线）或预先把缓存目录拷贝到位。
 - **建议**（见 2.3）：在 `rag_manager.py` 启动嵌入前**显式检测并清理损坏缓存 / 捕获超时给清晰报错**，避免静默降级。
 
 ---

@@ -6,6 +6,10 @@
 # 下限 0.6.0：0.5.x 要求 numpy<2.0，而 numpy 1.x 无 Python 3.13 轮子，故在 3.13 上必须 >=0.6.0
 chromadb>=0.6.0,<2.0.0
 
+# Ollama 嵌入（RAG 的 embedding.provider=ollama 时必需：
+# chromadb 的 OllamaEmbeddingFunction 依赖它；默认嵌入模型 bge-m3 中文检索强）
+ollama>=0.4.0
+
 # PDF 文档解析（RAG 导入 PDF 时需要；只用 md/txt 可删除本行）
 pypdf>=4.0.0
 

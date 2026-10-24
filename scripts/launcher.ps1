@@ -98,7 +98,7 @@ else { Write-Ok ("模型就绪: {0}" -f $model) }
 
 # ---------- 4b. 拉取视觉/图片解析模型（best-effort，用于“看图”）----------
 Write-Step "拉取视觉/图片解析模型（可选，首次较大）..."
-$vmodel = "qwen2.5vl:7b"
+$vmodel = "qwen2.5vl:7b-q4_K_M"
 $vf = Join-Path $root "config\ollama-vision-model.txt"
 if (Test-Path $vf) {
     foreach ($line in Get-Content $vf) {

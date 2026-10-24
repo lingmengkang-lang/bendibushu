@@ -5,9 +5,9 @@
     "comment": "collection 为向量库集合名，rag_manager.py 的 list/search/clear 均按此名操作"
   },
   "embedding": {
-    "provider": "chroma-default",
-    "ollama_model": "nomic-embed-text",
-    "comment": "provider=chroma-default 使用 Chroma 内置 ONNX 嵌入模型（首次运行会自动下载一次模型权重，需联网；之后完全离线）；provider=ollama 时使用本地 Ollama 嵌入模型（需先 ollama pull ollama_model 指定的模型）"
+    "provider": "ollama",
+    "ollama_model": "bge-m3",
+    "comment": "provider=ollama 使用本地 Ollama 嵌入模型（默认 bge-m3：中文/多语言强，1024 维，约1.2GB；需先 ollama pull bge-m3，且导入/检索时 Ollama 需在运行）；provider=chroma-default 使用 Chroma 内置 ONNX 嵌入（all-MiniLM-L6-v2，384 维，英文向，首次运行自动下载约80MB权重需联网）。⚠️ 切换 provider 或嵌入模型会改变向量维度，已有向量库必须先 clear 再重新 add-all 重建"
   },
   "chunk": {
     "size": 500,

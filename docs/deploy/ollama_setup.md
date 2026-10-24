@@ -99,7 +99,10 @@ CNB 侧流水线 2 已设 `allowFailure: true`：未注册节点时它失败不�
 .\scripts\setup_ollama.ps1
 
 # 只拉指定模型
-.\scripts\setup_ollama.ps1 -Models "qwen2.5:14b,nomic-embed-text"
+.\scripts\setup_ollama.ps1 -Models "qwen2.5:14b-instruct-q6_K,bge-m3"
+
+# 额外拉取视觉模型（图片解析用，best-effort）
+.\scripts\setup_ollama.ps1 -PullVision
 
 # 已手动下好 OllamaSetup.exe，走本地安装包（跳过 winget）
 .\scripts\setup_ollama.ps1 -InstallerPath D:\Downloads\OllamaSetup.exe
@@ -118,9 +121,9 @@ CNB 侧流水线 2 已设 `allowFailure: true`：未注册节点时它失败不�
 | winget 装不上 | 改用手动下载 `https://ollama.com/download`，再用 `-InstallerPath` 指定 |
 | 弹出 UAC 授权框 | 安装 Ollama 需要管理员权限，CI 里无人点确认就会超时失败 → 改用 `-InstallerPath` 预装，或以管理员身份本机跑一次 |
 | 模型拉取慢/中断 | `ollama pull` 支持断点续传，重跑脚本即可（已拉的模型会跳过） |
-| 6GB 显存能跑 14B 吗 | 能跑但会较慢；`qwen2.5:14b` 量化版可 CPU 卸载。想更快改 `qwen2.5:7b` |
+| 6GB 显存能跑 14B 吗 | 能跑但会较慢；`qwen2.5:14b-instruct-q6_K` 可 CPU 卸载（默认档，约 11.6GB）。嫌慢可改 `qwen2.5:14b`（Q4_K_M，约 8.9GB）或 `qwen2.5:7b`；想更准先把内存升级到 32GB 再上 32B（见 `config/ollama-models.txt` 升级路径） |
 | CI 里 PowerShell 中文乱码 | 所有 `.ps1` 均带 UTF-8 BOM（`scripts/ci_validate.py` 会校验这一点） |
-| 导入知识库时报 `The read operation timed out in upsert` | **嵌入模型没下完**。`chroma-default` 首次运行要下载约 80MB 的 `all-MiniLM-L6-v2` 权重，网络不通就会反复重试后超时。解法见 `docs/plc/rag_guide.md` 第 4.1 节：换 `provider: ollama`（`setup_ollama.ps1` 已自动拉 `nomic-embed-text`），或预置缓存 |
+| 导入知识库时报 `The read operation timed out in upsert` | **嵌入模型没下完**。仅当 `provider=chroma-default` 时首次运行要下载约 80MB 的 `all-MiniLM-L6-v2` 权重，网络不通就会反复重试后超时。本工程默认 `provider=ollama` + `bge-m3`（`setup_ollama.ps1` 会自动拉）不走此路；若坚持用 chroma-default，解法见 `docs/plc/rag_guide.md` 第 4.2 节 |
 
 ## 九、装好引擎后：知识库还要再走一步
 
