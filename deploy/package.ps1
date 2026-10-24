@@ -18,10 +18,56 @@ if (Test-Path $zip) {
     $zip = Join-Path $outDir ("local-offline-assistant-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".zip")
 }
 
+# 定位 git（兼容不同安装位置，避免依赖 PATH）：
+# PowerShell 下 git 可能不在 PATH；逐项探测常见安装路径。
+function Find-Git {
+    $cands = @(
+        "git",
+        (Join-Path $env:ProgramFiles "Git\cmd\git.exe"),
+        (Join-Path $env:LOCALAPPDATA "Programs\Git\cmd\git.exe"),
+        "$env:LOCALAPPDATA\Programs\Git\bin\git.exe",
+        "C:\Program Files\Git\cmd\git.exe"
+    )
+    # WorkBuddy 自带 PortableGit（沙箱/便携环境常见）
+    try {
+        $wb = Join-Path $env:USERPROFILE ".workbuddy\binaries\PortableGit\versions"
+        if (Test-Path $wb) {
+            foreach ($d in Get-ChildItem $wb -Directory -ErrorAction SilentlyContinue) {
+                $cands += Join-Path $d.FullName "cmd\git.exe"
+            }
+        }
+    } catch { }
+    foreach ($c in $cands) {
+        try {
+            if ($c -eq "git") {
+                $p = (Get-Command git -ErrorAction SilentlyContinue).Source
+                if ($p) { return $p }
+            } elseif (Test-Path $c) {
+                return $c
+            }
+        } catch { }
+    }
+    # 最后退回 cmd 的 where
+    try {
+        $r = cmd /c "where git" 2>$null
+        if ($r) { return $r.Split([Environment]::NewLine)[0].Trim() }
+    } catch { }
+    return $null
+}
+$git = Find-Git
+if (-not $git) {
+    Write-Host "[FAIL] 未找到 git。请先安装 Git（https://git-scm.com/downloads）。" -ForegroundColor Red
+    exit 1
+}
+
 Write-Host "正在用 git archive 打包（仅已提交文件，自动排除 .gitignore 项）..." -ForegroundColor Cyan
-$proc = Start-Process -FilePath "git" -ArgumentList ("archive","--format=zip","-o",$zip,"HEAD") `
-    -WorkingDirectory $root -Wait -PassThru -NoNewWindow
-if ($proc.ExitCode -ne 0) {
+# 注意：直接调用 git，不用 Start-Process —— PowerShell 5.1 的 Start-Process 在遇到
+# 环境中同时存在 HTTPS_PROXY / https_proxy（大小写不同）时会抛“字典关键字重复”异常。
+Push-Location $root
+& $git archive --format=zip -o $zip HEAD
+$rc = $LASTEXITCODE
+Pop-Location
+if ($rc -ne 0) {
     Write-Host "[FAIL] git archive 失败。请确认：在仓库目录内、且最新改动已 git commit。" -ForegroundColor Red
     exit 1
 }
