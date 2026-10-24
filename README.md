@@ -1,4 +1,6 @@
-# local-offline-assistant
+# bendibushu（local-offline-assistant）
+
+> **仓库对应**：GitHub（lingmengkang-lang/bendibushu）与 CNB（gongyeyingyong/bendibushu）同名同步；工程目录名为 local-offline-assistant。
 
 **Windows 本地离线 AI 助手一体化部署工程：Ollama 本地推理 + Chroma 本地 RAG 知识库 + LLaMA-Factory LoRA 微调训练 + WorkBuddy 接入配置，数据不出域，支持运维/办公/工控等多场景离线使用。**
 
