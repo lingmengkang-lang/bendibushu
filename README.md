@@ -130,7 +130,7 @@ local-offline-assistant/
 │   └── assistant/ROLE_RULES.md    助手角色铁律（10 条行为规则，已全部写进 webui SYSTEM_PROMPT）
 │   ├── deploy/
 │   │   └── ollama_setup.md         ⭐ 让 GitHub/CNB 自动帮你装 Ollama+模型（自托管节点）
-│   └── review/                     ⭐ 双视角审查报告（资深 IT + 20 年电气自动化）
+│   └── review/                     ⭐ 审查报告（资深 IT + 电气自动化 + 模型档位/图片解析专项，含签字核对单）
 └── data/ logs/ models/ lora/output/   运行时目录（部署时自动创建，不入库）
 ```
 
@@ -301,6 +301,7 @@ A：**能。** Web 界面点输入框左侧 📎 或把图片拖进输入框，�
 **双视角审查报告**（`docs/review/`）：
 - `it_review.md` —— 资深 30 年 IT 工程师视角：安全 / 健壮性 / 幂等 / 可观测 / CI 正确性，含 bug 清单与严重级；
 - `automation_review.md` —— 20 年电气自动化工程师视角：Modbus 0基/1基偏移、各品牌脚本语法准确性、上位机写入校验/轮询/超时、安全红线充分性，给出"必须改/建议改/可不改"结论。
+- `model_upgrade_review.md` —— 模型档位上调 + 图片解析能力专项：大模型"更自信地错"风险、四类看图场景误读评估、bge-m3 检索影响，附**交电气工程师签字的 8 项核对单**。
 - `assistant/ROLE_RULES.md` —— 用户对本地离线助手定下的 **10 条行为铁律**（诚实/推理优先/来源标注/领域严谨/上下文管控/拒绝污染/输出自检/模式区分/格式/中文），已全部写进 `app/webui.py` 的 `SYSTEM_PROMPT`，作为 Web 聊天界面的实时约束（见第十一节本机复验的同一份代码）。
 
 ## 十二、许可
