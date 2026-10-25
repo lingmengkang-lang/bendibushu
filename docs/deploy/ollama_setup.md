@@ -121,7 +121,7 @@ CNB 侧流水线 2 已设 `allowFailure: true`：未注册节点时它失败不�
 | winget 装不上 | 改用手动下载 `https://ollama.com/download`，再用 `-InstallerPath` 指定 |
 | 弹出 UAC 授权框 | 安装 Ollama 需要管理员权限，CI 里无人点确认就会超时失败 → 改用 `-InstallerPath` 预装，或以管理员身份本机跑一次 |
 | 模型拉取慢/中断 | `ollama pull` 支持断点续传，重跑脚本即可（已拉的模型会跳过） |
-| 6GB 显存能跑 32B 吗 | 能跑但会较慢：32B Q4_K_M 仅约 1/4 层进 6GB 显存，其余 CPU 卸载（i7-14650HX 约几 token/s）。默认档即 32B（配 24GB 部署机；该机无独显时接近上限，可改 `qwen2.5:14b-instruct-q6_K`） |
+| 6GB 显存能跑 32B 吗 | 能跑但会较慢：32B Q4_K_M 仅约 1/4 层进 6GB 显存，其余 CPU 卸载（i7-14650HX 约几 token/s）。默认档即 32B（配 24GB + 独显部署机，已确认可跑；嫌慢可改 `qwen2.5:14b-instruct-q6_K`） |
 | 内存不足时拉取 32B 会怎样 | 脚本有内存护栏：所需最小内存（32B≈24GB/72B≈48GB）超过物理内存时**自动跳过拉取并提示**，不会下完 20GB 却跑不动。加内存后重跑即可（幂等）。注：16GB 开发/验证机会被护栏自动跳过，属预期行为 |
 | CI 里 PowerShell 中文乱码 | 所有 `.ps1` 均带 UTF-8 BOM（`scripts/ci_validate.py` 会校验这一点） |
 | 导入知识库时报 `The read operation timed out in upsert` | **嵌入模型没下完**。仅当 `provider=chroma-default` 时首次运行要下载约 80MB 的 `all-MiniLM-L6-v2` 权重，网络不通就会反复重试后超时。本工程默认 `provider=ollama` + `bge-m3`（`setup_ollama.ps1` 会自动拉）不走此路；若坚持用 chroma-default，解法见 `docs/plc/rag_guide.md` 第 4.2 节 |
