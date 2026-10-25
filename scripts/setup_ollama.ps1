@@ -74,7 +74,8 @@ function Test-RamForModel([string]$name) {
     $need = Get-ModelMinRamGB $name
     if ($ram -le 0 -or $ram -ge $need) { return $true }
     Write-Warn ("内存不足，跳过拉取 {0}（本机 {1}GB < 约需 {2}GB）。" -f $name, $ram, $need)
-    Write-Warn "升级内存后重跑本脚本即可（幂等）；或把模型清单改成本机能跑的档位。"
+    Write-Warn "给这台机器加内存后重跑本脚本即可（幂等）；或把模型清单改成本机能跑的档位。"
+    Write-Warn "  注：若本机是 16GB 开发/验证机（助手实际跑在另一台 24GB 电脑），此跳过属预期，去目标机部署即可"
     return $false
 }
 

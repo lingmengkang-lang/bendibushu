@@ -51,7 +51,7 @@
            全部组件本地运行，业务数据不出本机
 ```
 
-**图片解析（看图）能力**：Web 界面可上传 / 拖拽图片，自动走视觉模型（默认 `qwen2.5vl:32b-q4_K_M`，32GB 内存档；16GB 回退 `qwen2.5vl:7b-q4_K_M`，在 `config/ollama-vision-model.txt` 指定）解析——
+**图片解析（看图）能力**：Web 界面可上传 / 拖拽图片，自动走视觉模型（默认 `qwen2.5vl:32b-q4_K_M`，24GB 部署机档；吃紧/无独显时回退 `qwen2.5vl:7b-q4_K_M`，在 `config/ollama-vision-model.txt` 指定）解析——
 覆盖电气/PLC 图纸与程序截图、变频器/伺服/编码器铭牌与参数面板、HMI/组态画面与报警截图、通用 OCR 四类场景，
 并叠加工控 RAG 与图片解析专用准确度规则；用法与准确度保障见 `docs/plc/image_parsing.md`。
 
@@ -79,7 +79,7 @@ local-offline-assistant/
 ├── LICENSE                         MIT 许可证
 ├── config/
 │   ├── rag.config.json             RAG 参数（向量库/嵌入/分块/支持格式/知识目录）
-│   ├── ollama-models.txt           推荐模型清单（含 16G 实测硬件指引 + 内存升级路径）
+│   ├── ollama-models.txt           推荐模型清单（含 16G 实测硬件指引 + 内存加装路径）
 │   ├── ollama-vision-model.txt     视觉模型清单（图片解析用，默认 qwen2.5vl:32b-q4_K_M）
 │   └── workbuddy/
 │       ├── mcp.fragment.json       WorkBuddy MCP 接入配置片段
@@ -184,8 +184,8 @@ python scripts\rag_manager.py search "西门子 S7-1200 高速计数器怎么配
 | 配置 | 位置 | 要点 |
 |---|---|---|
 | RAG | `config/rag.config.json` | 集合名、嵌入方式（默认 `ollama` + `bge-m3`，中文强；备选 `chroma-default`）、分块大小与重叠、支持的文件格式 |
-| 模型清单 | `config/ollama-models.txt` | 推理/嵌入模型推荐 + **16G 实测硬件 + 内存升级路径**指引【⚠️体积/速度为经验值】 |
-| 视觉模型清单 | `config/ollama-vision-model.txt` | 图片解析用视觉模型，默认 `qwen2.5vl:32b-q4_K_M`（32GB 档；16GB 回退 7b-q4_K_M） |
+| 模型清单 | `config/ollama-models.txt` | 推理/嵌入模型推荐 + **16G 实测硬件 + 内存加装路径**指引【⚠️体积/速度为经验值】 |
+| 视觉模型清单 | `config/ollama-vision-model.txt` | 图片解析用视觉模型，默认 `qwen2.5vl:32b-q4_K_M`（24GB 部署机档；吃紧/无独显回退 7b-q4_K_M） |
 | WorkBuddy | `config/workbuddy/mcp.fragment.json` | **仅结构示例**，真实 command/args 需按你选用的 MCP 服务器填写【⚠️需核实】，见同目录 knowledge-base.md |
 | LoRA | `lora/configs/qlora_sft.yaml` | 字段随 LLaMA-Factory 版本演进，以官方文档为准（可选组件） |
 
@@ -230,18 +230,17 @@ A：Ollama 可 CPU 推理 7B（慢但可用）；LoRA 训练 7B 在 CPU 上基�
 A：LLaMA-Factory 单卡流程在 Windows 原生环境可跑通；多卡/量化内核/DeepSpeed 场景建议 Linux 或 WSL2【⚠️社区经验】。
 
 **Q：PLC 编程/伺服/变频/触摸屏/HMI/组态软件/上位机 这类专业问题，小模型够用吗？**
-A：7B 偏弱、易幻觉。本清单默认已按 **32B 档**预置（`qwen2.5:32b-instruct-q4_K_M`，配 32GB 内存；内存升级完成前的临时回退是 `qwen2.5:14b-instruct-q6_K`）。但更关键的是把你们的手册/程序喂进 RAG（默认嵌入 `bge-m3`，中文检索明显更准，见 `docs/plc/rag_guide.md`）——领域准确性靠"模型 + 你的资料"双管齐下。
+A：7B 偏弱、易幻觉。本清单默认已按 **32B 档**预置（`qwen2.5:32b-instruct-q4_K_M`，配 24GB 部署机；该机无独显/跑不动时的临时回退是 `qwen2.5:14b-instruct-q6_K`）。但更关键的是把你们的手册/程序喂进 RAG（默认嵌入 `bge-m3`，中文检索明显更准，见 `docs/plc/rag_guide.md`）——领域准确性靠"模型 + 你的资料"双管齐下。
 
 **Q：想让模型更大更准（32B/70B）？现在是什么档位？**
-A：**已按"升级到 32GB 内存"的目标预置好 32B 默认档**——文本 `qwen2.5:32b-instruct-q4_K_M`（约 19.8GB）、视觉 `qwen2.5vl:32b-q4_K_M`（约 20GB）、排错 `deepseek-r1:32b`，升级完内存重跑一次部署即用。两点保护：
+A：**已按部署目标机（另一台 24GB 内存电脑）预置好 32B 默认档**——文本 `qwen2.5:32b-instruct-q4_K_M`（约 19.8GB）、视觉 `qwen2.5vl:32b-q4_K_M`（约 20GB）、排错 `deepseek-r1:32b`，在目标机上首次部署即拉取使用。三点说明：
 
-- **内存护栏**：本机现在还是 16GB，启动脚本检测到内存不足会**自动跳过拉取**并提示（不会白下 20GB 再卡死）；想先用着就把 `config/ollama-models.txt` 第一个未注释项临时改成 `qwen2.5:14b-instruct-q6_K`。
-- **升级操作**（Lenovo Legion 5 16IRX9/83DG，双 SO-DIMM，官方最大 64GB DDR5-5600，**必须成对安装**）：购 **2×16GB DDR5-5600 SO-DIMM** 替换现有 2×8GB → 断电拆后盖 → 斜插入卡扣至两声 → 装回通电 → 进系统确认双通道 → 重跑 `启动.bat`。⚠️ 拆机有风险（保修/卡扣/静电），升级前备份重要数据，不熟悉送联想服务站。
-
-再往上（72B 档）需 64GB（2×32GB），取消 `config/ollama-models.txt` 里 72B 行注释即可。
+- **机器拓扑**：助手实际跑在**另一台 24GB 电脑**上（24GB 是 32B Q4_K_M 的及格线：有独显≥4GB 舒适，纯核显接近上限、偏慢；无独显可把默认改成 14B 档，见 `config/ollama-models.txt`）。本仓库所在的开发/验证机是 16GB，只做开发验证。
+- **内存护栏**：启动脚本检测到内存不足会**自动跳过拉取**并提示（不会白下 20GB 再卡死）；在 16GB 开发机上想先跑通流程，就把 `config/ollama-models.txt` 第一个未注释项临时改成 `qwen2.5:14b-instruct-q6_K`。
+- **想上更大档位**（Q5_K_M/72B）需先给目标机加内存（72B 需 64GB，双 SO-DIMM 机型须成对，先确认官方最大容量）；加完取消 `config/ollama-models.txt` 对应行注释即可。
 
 **Q：能解析图片吗（电气/PLC 图纸、铭牌参数、HMI/报警画面、OCR）？**
-A：**能。** Web 界面点输入框左侧 📎 或把图片拖进输入框，自动走视觉模型（默认 `qwen2.5vl:32b-q4_K_M`，32GB 内存档；首次需联网拉取），无图时走文本模型。覆盖四类场景：图纸/程序截图、变频器/伺服/编码器铭牌与参数面板、HMI/组态画面与报警截图、通用 OCR；解析会叠加工控 RAG 与专用准确度规则（看不清的直说、推测标注需核对）。用法与排障见 `docs/plc/image_parsing.md`。
+A：**能。** Web 界面点输入框左侧 📎 或把图片拖进输入框，自动走视觉模型（默认 `qwen2.5vl:32b-q4_K_M`，24GB 部署机档；首次需联网拉取），无图时走文本模型。覆盖四类场景：图纸/程序截图、变频器/伺服/编码器铭牌与参数面板、HMI/组态画面与报警截图、通用 OCR；解析会叠加工控 RAG 与专用准确度规则（看不清的直说、推测标注需核对）。用法与排障见 `docs/plc/image_parsing.md`。
 
 ## 八、工控应用专章（本工程全部重心）
 

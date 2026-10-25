@@ -53,8 +53,9 @@ function Test-RamForModel([string]$name) {
     if ($ram -ge $need) { return $true }
     Write-Warn ("内存不足，已跳过拉取 {0}（本机 {1}GB < 约需 {2}GB）。" -f $name, $ram, $need)
     Write-Warn "内存不足时大模型不是'慢'，而是磁盘交换卡死。两个选择："
-    Write-Warn "  A) 升级内存后重跑 启动.bat（32B 档约需 24GB+，72B 档约需 48GB+）"
-    Write-Warn "  B) 暂不升级：把 config\ollama-models.txt 第一个未注释项改成 qwen2.5:14b-instruct-q6_K（16GB 可跑）"
+    Write-Warn "  A) 给这台机器加内存后重跑 启动.bat（32B 档约需 24GB+，72B 档约需 48GB+）"
+    Write-Warn "  B) 暂不加：把 config\ollama-models.txt 第一个未注释项改成 qwen2.5:14b-instruct-q6_K（12GB+ 可跑）"
+    Write-Warn "  注：若本机是 16GB 开发/验证机（助手实际跑在另一台 24GB 电脑），此跳过属预期，去目标机部署即可"
     return $false
 }
 
