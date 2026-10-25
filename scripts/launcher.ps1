@@ -23,6 +23,41 @@ function Open-Url([string]$u){
     try { Start-Process $u } catch { }
 }
 
+function Get-TotalRamGB {
+    # 返回物理内存总量（GB）；读不到返回 0（表示跳过内存护栏）
+    try {
+        $m = Get-CimInstance Win32_PhysicalMemory
+        $sum = ($m | Measure-Object Capacity -Sum).Sum
+        if ($sum -gt 0) { return [math]::Round($sum/1GB, 1) }
+    } catch { }
+    return 0
+}
+
+function Get-ModelMinRamGB([string]$name) {
+    # 按模型 tag 估算"能跑起来"的最小内存（经验值，偏保守；CPU 卸载虽能突破但速度不可接受）
+    $n = $name.ToLower()
+    if ($n -match "72b") { return 48 }
+    if ($n -match "32b") { return 24 }
+    if ($n -match "14b") { return 12 }
+    if ($n -match "7b")  { return 8 }
+    if ($n -match "3b")  { return 4 }
+    if ($n -match "bge-m3|nomic|minicpm") { return 2 }
+    return 8
+}
+
+function Test-RamForModel([string]$name) {
+    # 内存够返回 $true；不够打印警告并返回 $false（调用方跳过拉取）
+    $ram = Get-TotalRamGB
+    $need = Get-ModelMinRamGB $name
+    if ($ram -le 0) { return $true }   # 读不到内存信息时不阻拦
+    if ($ram -ge $need) { return $true }
+    Write-Warn ("内存不足，已跳过拉取 {0}（本机 {1}GB < 约需 {2}GB）。" -f $name, $ram, $need)
+    Write-Warn "内存不足时大模型不是'慢'，而是磁盘交换卡死。两个选择："
+    Write-Warn "  A) 升级内存后重跑 启动.bat（32B 档约需 24GB+，72B 档约需 48GB+）"
+    Write-Warn "  B) 暂不升级：把 config\ollama-models.txt 第一个未注释项改成 qwen2.5:14b-instruct-q6_K（16GB 可跑）"
+    return $false
+}
+
 Write-Host "=========================================================" -ForegroundColor Cyan
 Write-Host "   本地离线工控助手 · 一键部署与启动" -ForegroundColor Cyan
 Write-Host "=========================================================" -ForegroundColor Cyan
@@ -82,7 +117,7 @@ Write-Ok ("Ollama 就绪: " + $ollama.Source)
 
 # ---------- 4. 拉取默认模型 ----------
 Write-Step "拉取默认模型（首次较大，请耐心等待）..."
-$model = "qwen2.5:14b"
+$model = "qwen2.5:32b-instruct-q4_K_M"
 $mf = Join-Path $root "config\ollama-models.txt"
 if (Test-Path $mf) {
     foreach ($line in Get-Content $mf) {
@@ -92,13 +127,15 @@ if (Test-Path $mf) {
     }
 }
 Write-Host ("   模型: {0}" -f $model)
-& ollama pull $model
-if ($LASTEXITCODE -ne 0) { Write-Warn ("模型拉取失败（网络/磁盘？）。可稍后手动: ollama pull {0}" -f $model) }
-else { Write-Ok ("模型就绪: {0}" -f $model) }
+if (Test-RamForModel $model) {
+    & ollama pull $model
+    if ($LASTEXITCODE -ne 0) { Write-Warn ("模型拉取失败（网络/磁盘？）。可稍后手动: ollama pull {0}" -f $model) }
+    else { Write-Ok ("模型就绪: {0}" -f $model) }
+}
 
 # ---------- 4b. 拉取视觉/图片解析模型（best-effort，用于“看图”）----------
 Write-Step "拉取视觉/图片解析模型（可选，首次较大）..."
-$vmodel = "qwen2.5vl:7b-q4_K_M"
+$vmodel = "qwen2.5vl:32b-q4_K_M"
 $vf = Join-Path $root "config\ollama-vision-model.txt"
 if (Test-Path $vf) {
     foreach ($line in Get-Content $vf) {
@@ -108,9 +145,11 @@ if (Test-Path $vf) {
     }
 }
 Write-Host ("   视觉模型: {0}" -f $vmodel)
-& ollama pull $vmodel
-if ($LASTEXITCODE -ne 0) { Write-Warn ("视觉模型拉取失败（网络/磁盘？）。图片解析功能暂不可用；可稍后手动: ollama pull {0}" -f $vmodel) }
-else { Write-Ok ("视觉模型就绪: {0}" -f $vmodel) }
+if (Test-RamForModel $vmodel) {
+    & ollama pull $vmodel
+    if ($LASTEXITCODE -ne 0) { Write-Warn ("视觉模型拉取失败（网络/磁盘？）。图片解析功能暂不可用；可稍后手动: ollama pull {0}" -f $vmodel) }
+    else { Write-Ok ("视觉模型就绪: {0}" -f $vmodel) }
+}
 
 # ---------- 5. 导入知识库（best-effort）----------
 Write-Step "导入知识库（best-effort，首次可能需联网下载嵌入模型）..."

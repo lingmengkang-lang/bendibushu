@@ -218,7 +218,7 @@ def default_vision_model():
             return t.split("#")[0].strip()
     except Exception:
         pass
-    return "qwen2.5vl:7b-q4_K_M"
+    return "qwen2.5vl:32b-q4_K_M"
 
 
 # 图片解析专用规则（在 SYSTEM_PROMPT 的 10 条铁律之上，进一步约束“看得清的才说”以提升准确度）

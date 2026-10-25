@@ -47,6 +47,37 @@ function Write-Ok([string]$msg)   { Write-Host ("[OK] {0}" -f $msg) -ForegroundC
 function Write-Warn([string]$msg) { Write-Host ("[WARN] {0}" -f $msg) -ForegroundColor Yellow }
 function Write-Err([string]$msg)  { Write-Host ("[FAIL] {0}" -f $msg) -ForegroundColor Red }
 
+# 内存护栏：模型所需最小内存（经验值）超过本机物理内存时跳过拉取，
+# 避免"下完 20GB 却因内存不足跑不动"。读不到内存信息时不阻拦。
+function Get-TotalRamGB {
+    try {
+        $m = Get-CimInstance Win32_PhysicalMemory
+        $sum = ($m | Measure-Object Capacity -Sum).Sum
+        if ($sum -gt 0) { return [math]::Round($sum/1GB, 1) }
+    } catch { }
+    return 0
+}
+
+function Get-ModelMinRamGB([string]$name) {
+    $n = $name.ToLower()
+    if ($n -match "72b") { return 48 }
+    if ($n -match "32b") { return 24 }
+    if ($n -match "14b") { return 12 }
+    if ($n -match "7b")  { return 8 }
+    if ($n -match "3b")  { return 4 }
+    if ($n -match "bge-m3|nomic|minicpm") { return 2 }
+    return 8
+}
+
+function Test-RamForModel([string]$name) {
+    $ram = Get-TotalRamGB
+    $need = Get-ModelMinRamGB $name
+    if ($ram -le 0 -or $ram -ge $need) { return $true }
+    Write-Warn ("内存不足，跳过拉取 {0}（本机 {1}GB < 约需 {2}GB）。" -f $name, $ram, $need)
+    Write-Warn "升级内存后重跑本脚本即可（幂等）；或把模型清单改成本机能跑的档位。"
+    return $false
+}
+
 Write-Host "===== Ollama 引擎安装 / 模型拉取 =====" -ForegroundColor Cyan
 Write-Host ("工程目录: {0}" -f $root)
 Write-Host ("日志文件 : {0}" -f $logFile)
@@ -197,6 +228,7 @@ if ($SkipPull) {
             Write-Ok ("已存在，跳过: {0}" -f $m)
             continue
         }
+        if (-not (Test-RamForModel $m)) { continue }
         Write-Step ("拉取 {0} （体积较大，耗时取决于网络）..." -f $m)
         & $ollamaExe pull $m
         if ($LASTEXITCODE -ne 0) {
@@ -221,6 +253,8 @@ if ($PullVision -and -not $SkipPull) {
     $installed = Get-InstalledModels -Exe $ollamaExe
     if ($installed -contains $visionModel) {
         Write-Ok ("视觉模型已存在，跳过: {0}" -f $visionModel)
+    } elseif (-not (Test-RamForModel $visionModel)) {
+        # 内存不足：跳过（图片解析暂不可用，文本问答不受影响）
     } else {
         Write-Step ("拉取视觉/图片解析模型 {0} （体积较大，best-effort）..." -f $visionModel)
         & $ollamaExe pull $visionModel
