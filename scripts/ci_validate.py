@@ -32,6 +32,7 @@ REQUIRED_FILES = [
     "config/ollama-models.txt",
     "config/ollama-vision-model.txt",
     "config/rag.config.json",
+    "docs/deploy/HANDOFF.md",
     "scripts/rag_manager.py",
     "scripts/start.ps1",
     "scripts/stop.ps1",

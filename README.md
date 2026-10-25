@@ -129,7 +129,8 @@ local-offline-assistant/
 │   ├── devices/                    ⭐ 常用电气件使用方法（你自己持续补充）
 │   └── assistant/ROLE_RULES.md    助手角色铁律（10 条行为规则，已全部写进 webui SYSTEM_PROMPT）
 │   ├── deploy/
-│   │   └── ollama_setup.md         ⭐ 让 GitHub/CNB 自动帮你装 Ollama+模型（自托管节点）
+│   │   ├── ollama_setup.md         ⭐ 让 GitHub/CNB 自动帮你装 Ollama+模型（自托管节点）
+│   │   └── HANDOFF.md              ⭐ 部署交接单：换机器/换人接手时读它（零上下文从零部署+检查点清单）
 │   └── review/                     ⭐ 审查报告（资深 IT + 电气自动化 + 模型档位/图片解析专项，含签字核对单）
 └── data/ logs/ models/ lora/output/   运行时目录（部署时自动创建，不入库）
 ```
